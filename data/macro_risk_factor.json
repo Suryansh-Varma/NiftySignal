@@ -1,0 +1,33 @@
+{
+  "update_date": "2026-03-18 16:45:00",
+  "update_source": "auto",
+  "macro_risk_factor": 0.6325,
+  "adjusted_risk_factor": 0.6325,
+  "risk_level": "HIGH",
+  "position_sizing": {
+    "position_size_pct": 1.0,
+    "max_positions": 10,
+    "stance": "Defensive"
+  },
+  "risk_factors": {
+    "vix_equivalent": 0.45,
+    "gold_demand": 0.65,
+    "oil_price": 0.6,
+    "currency": 0.85,
+    "market_trend": 0.85
+  },
+  "raw_market_data": {
+    "india_vix": 18.72249984741211,
+    "gold_usd": 4961.7001953125,
+    "crude_oil_usd": 94.2300033569336,
+    "usd_inr": 92.64099884033203,
+    "nifty_30d_return": -6.18
+  },
+  "factor_descriptions": {
+    "india_vix": "18.7 (Moderate)",
+    "gold": "$4962 (Very high demand)",
+    "crude_oil": "$94 (Elevated)",
+    "usd_inr": "\u20b992.64 (Extreme depreciation)",
+    "nifty_trend": "-6.2% (Sharp selloff)"
+  }
+}
