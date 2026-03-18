@@ -256,13 +256,345 @@ sudo certbot certonly --nginx -d your-domain.com
 
 ---
 
-## Support & Questions
+## Backend (Python/FastAPI) Deployment
 
-- Frontend issues: Check `frontend/pages/dashboard.tsx` or component files
-- WebSocket issues: Check `ws-server/index.js` logs
-- Deployment issues: Consult Vercel / Render / Docker docs
+The Python backend provides APIs for recommendations, portfolio analysis, and market data.
+
+### Local Development
+
+```bash
+# Create virtual environment
+python -m venv .venv
+
+# Activate it
+# Windows:
+.venv\Scripts\activate
+# macOS/Linux:
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run backend
+python -m uvicorn app.api.main:app --reload --host 0.0.0.0 --port 8000
+# or
+python app/scheduler.py
+```
+
+**API Docs**: http://localhost:8000/docs (Swagger UI)
+
+### Environment Variables (.env)
+
+```
+DATABASE_URL=postgresql://user:password@localhost/niftysignal
+# or for SQLite:
+DATABASE_URL=sqlite:///./niftysignal.db
+
+SUPABASE_URL=your_supabase_url
+SUPABASE_KEY=your_supabase_key
+
+API_PORT=8000
+DEBUG=True
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+LOG_LEVEL=INFO
+```
+
+### Docker Deployment (Backend)
+
+**Dockerfile** for backend:
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+ENV DEBUG=False
+ENV API_PORT=8000
+
+CMD ["python", "-m", "uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+**Build and run**:
+```bash
+docker build -t niftysignal-backend:latest .
+docker run -d \
+  -e DATABASE_URL="postgresql://..." \
+  -e SUPABASE_URL="..." \
+  -p 8000:8000 \
+  niftysignal-backend:latest
+```
+
+### Full-Stack Docker Compose
+
+Update your `docker-compose.yml` to include the backend:
+
+```yaml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: niftysignal
+      POSTGRES_USER: niftysignal
+      POSTGRES_PASSWORD: your_secure_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://niftysignal:your_secure_password@postgres:5432/niftysignal
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
+      DEBUG: "False"
+      CORS_ORIGINS: http://frontend:3000
+    depends_on:
+      - postgres
+    volumes:
+      - ./app:/app/app  # Hot-reload in dev
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:8000
+      NEXT_PUBLIC_WS_URL: http://localhost:4000
+    depends_on:
+      - backend
+
+  ws-server:
+    build: ./ws-server
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+
+volumes:
+  postgres_data:
+```
+
+### Production Deployment Options
+
+#### Option 1: Linux VPS (AWS, DigitalOcean, Linode)
+
+```bash
+# SSH into server
+ssh user@your-vps
+
+# Install Python & dependencies
+sudo apt update && sudo apt install python3.11 python3.11-venv python3-pip postgresql-15
+python3.11 -m venv /opt/niftysignal/.venv
+source /opt/niftysignal/.venv/bin/activate
+pip install -r requirements.txt gunicorn
+
+# Create systemd service for backend
+sudo nano /etc/systemd/system/niftysignal-backend.service
+```
+
+**Service file content**:
+```ini
+[Unit]
+Description=NiftySIgnal Backend
+After=network.target postgresql.service
+
+[Service]
+Type=notify
+User=niftysignal
+WorkingDirectory=/opt/niftysignal
+Environment="PATH=/opt/niftysignal/.venv/bin"
+ExecStart=/opt/niftysignal/.venv/bin/gunicorn -w 4 -b 0.0.0.0:8000 app.api.main:app
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable niftysignal-backend
+sudo systemctl start niftysignal-backend
+```
+
+#### Option 2: Render.com
+
+1. Push repo to GitHub
+2. Create new Web Service on Render
+3. **Build Command**: `pip install -r requirements.txt`
+4. **Start Command**: `gunicorn -w 4 -b 0.0.0.0:10000 app.api.main:app`
+5. Add environment variables (DATABASE_URL, SUPABASE credentials)
+6. Deploy
+
+#### Option 3: Railway.app
+
+1. Create new project on Railway
+2. Add PostgreSQL database
+3. Deploy from GitHub
+4. Set environment variables
+5. Railway auto-generates DATABASE_URL
+
+#### Option 4: AWS Elastic Beanstalk
+
+```bash
+# Install EB CLI
+pip install awsebcli
+
+# Initialize EB application
+eb init -p python-3.11 niftysignal
+
+# Create environment and deploy
+eb create niftysignal-env
+eb deploy
+```
+
+### Database Migrations
+
+If using SQLAlchemy with Alembic:
+
+```bash
+# Generate migrations
+alembic revision --autogenerate -m "Add users table"
+
+# Apply migrations locally
+alembic upgrade head
+
+# In production, run during deployment
+# (before starting the application)
+alembic upgrade head
+```
+
+### Health Check & Monitoring
+
+```bash
+# Health endpoint (add to your FastAPI app)
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
+# Test locally
+curl http://localhost:8000/health
+
+# Monitor logs
+tail -f /var/log/niftysignal-backend.log
+```
+
+### Performance Tuning
+
+**Gunicorn workers** (adjust based on CPU cores):
+```bash
+gunicorn -w $((2 * $(nproc) + 1)) -b 0.0.0.0:8000 app.api.main:app
+```
+
+**Database connection pooling**:
+```python
+# In SQLAlchemy engine creation
+engine = create_engine(
+    database_url,
+    pool_size=20,
+    max_overflow=40,
+    pool_recycle=3600,
+    echo=False
+)
+```
+
+**Caching** (Redis):
+```python
+from redis import Redis
+redis_client = Redis(host='localhost', port=6379, db=0)
+
+# Cache recommendations
+cached = redis_client.get('recommendations')
+if not cached:
+    recommendations = fetch_recommendations()
+    redis_client.setex('recommendations', 3600, json.dumps(recommendations))
+```
+
+### SSL/TLS with Nginx Reverse Proxy
+
+```nginx
+upstream niftysignal_backend {
+    server 127.0.0.1:8000;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name api.yourdomain.com;
+
+    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+
+    location / {
+        proxy_pass http://niftysignal_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+}
+
+# Redirect HTTP to HTTPS
+server {
+    listen 80;
+    server_name api.yourdomain.com;
+    return 301 https://$server_name$request_uri;
+}
+```
 
 ---
 
-**Last Updated**: February 2026  
-**Version**: 1.0
+## Production Checklist (Full Stack)
+
+### Security
+- [ ] Set `DEBUG=False` in production
+- [ ] Use strong database passwords
+- [ ] Enable HTTPS/SSL for frontend + backend
+- [ ] Validate all API inputs (Pydantic models enforce this)
+- [ ] Set up CORS with specific origins (not `*`)
+- [ ] Use secure WebSocket (WSS) in production
+- [ ] Rate limiting on APIs (see Security section below)
+- [ ] Use environment variables for all secrets
+
+### Database
+- [ ] Database backups configured (daily)
+- [ ] Connection pooling enabled
+- [ ] Indexes created on frequently-queried columns
+- [ ] Database user has minimal permissions
+
+### Monitoring & Logging
+- [ ] Centralized logging (CloudWatch, ELK, Loggly)
+- [ ] Error tracking (Sentry, Rollbar)
+- [ ] Uptime monitoring (UptimeRobot, Datadog)
+- [ ] Performance monitoring (New Relic, DataDog)
+- [ ] Alert thresholds configured
+
+### Scaling
+- [ ] Load balancer configured (if multiple backend instances)
+- [ ] Auto-scaling policies set (CPU > 70%, memory > 80%)
+- [ ] CDN enabled for frontend static assets
+- [ ] Database read replicas (if high-traffic)
+
+---
+
+## Support & Resources
+
+- **Backend Issues**: Check `app/api/main.py` and `/app` folder
+- **Database Issues**: Check PostgreSQL logs
+- **API Docs**: `https://yourdomain.com/docs`
+- **Deployment Logs**: Check systemd journal or cloud provider logs
+
+---
+
+**Last Updated**: March 2026  
+**Version**: 2.0

@@ -42,7 +42,7 @@ export default function Home() {
                 NiftySignal <span className="text-[var(--primary-glow)]">AI</span>
               </h1>
               <p className="text-[var(--text-secondary)] font-mono text-xs tracking-widest uppercase">
-                Neural Intelligence Console // Status: Operational
+                        Smart market signals for NSE stocks
               </p>
             </div>
             
@@ -79,18 +79,18 @@ export default function Home() {
 
                <div className="p-6 rounded-3xl border border-[var(--border-glass)] bg-gradient-to-br from-[#0c111a] to-[#05070a] shadow-xl">
                   <div className="flex items-center justify-between mb-4">
-                     <span className="text-[10px] font-mono text-[var(--secondary-glow)]">NETWORK_STABILITY</span>
+                     <span className="text-[10px] font-mono text-[var(--secondary-glow)]">SYSTEM HEALTH</span>
                      <div className="h-1 w-1 rounded-full bg-[var(--secondary-glow)] animate-pulse"></div>
                   </div>
-                  <p className="text-sm text-[var(--text-secondary)] font-medium">Neural Core v4.0 monitoring 50 instruments with 64.2% historical accuracy metrics applied.</p>
+                  <p className="text-sm text-[var(--text-secondary)] font-medium">Live scan is running across top NSE names. Signals refresh continuously based on latest model output.</p>
                </div>
             </div>
           </div>
 
           <div className="p-8 rounded-3xl border border-[var(--border-glass)] bg-[var(--bg-card)]">
              <div className="flex justify-between items-center mb-8">
-                <h3 className="text-xl font-black text-white uppercase tracking-tighter italic">Instrument Reconnaissance</h3>
-                <span className="bg-[var(--bg-deep)] py-2 px-4 rounded-full border border-[var(--border-glass)] text-[10px] font-mono text-[var(--text-muted)]">SYNC_TIMESTAMP: 2026-03-18 16:45 IST</span>
+                <h3 className="text-xl font-black text-white uppercase tracking-tighter italic">Top Recommendations</h3>
+                <span className="bg-[var(--bg-deep)] py-2 px-4 rounded-full border border-[var(--border-glass)] text-[10px] font-mono text-[var(--text-muted)]">LIVE DATA</span>
              </div>
 
              <div className="overflow-x-auto">
@@ -127,7 +127,7 @@ export default function Home() {
                                  </div>
                               </td>
                               <td className="py-4 text-right">
-                                 <Link href={`/predict/${r.symbol.replace('.NS', '')}`} className="text-[10px] font-bold text-[var(--text-muted)] group-hover:text-[var(--primary-glow)] transition-colors">ANALYSIS_REPORT</Link>
+                                 <Link href={`/company/${r.symbol}`} className="text-[10px] font-bold text-[var(--text-muted)] group-hover:text-[var(--primary-glow)] transition-colors">VIEW DETAILS</Link>
                               </td>
                            </tr>
                         ))
@@ -153,7 +153,7 @@ export default function Home() {
         <div className="container mx-auto px-6 text-center relative z-20 space-y-8 max-w-4xl">
            <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full border border-[var(--border-glass)] bg-[var(--bg-glass)] text-[10px] font-mono tracking-widest text-[var(--primary-glow)] uppercase">
               <div className="h-1 w-1 rounded-full bg-[var(--primary-glow)] animate-pulse"></div>
-              System V4.0 Active // Node: Institutional
+              AI signal engine active
            </div>
 
            <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-none italic uppercase">
@@ -161,31 +161,30 @@ export default function Home() {
            </h1>
 
            <p className="text-lg md:text-xl text-[var(--text-secondary)] font-medium max-w-2xl mx-auto leading-relaxed">
-              Institutional-grade market intelligence mapped via proprietary neural infrastructure. 
-              The singular trading terminal for NSE equity insights.
+              Track AI-driven stock recommendations, portfolio risk, and goal planning in one simple dashboard.
            </p>
 
            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 pt-6">
               <Link href="/signup" className="w-full sm:w-auto px-10 py-4 rounded-2xl bg-[var(--primary-glow)] text-black font-black uppercase tracking-widest text-sm hover:translate-y-[-2px] active:translate-y-[1px] transition-all shadow-[0_0_30px_rgba(0,255,204,0.2)]">
-                 Initialize Access
+                 Create Account
               </Link>
               <Link href="/login" className="w-full sm:w-auto px-10 py-4 rounded-2xl border border-[var(--border-glass)] bg-[var(--bg-glass)] text-white font-bold uppercase tracking-widest text-sm hover:bg-white/5 transition-all">
-                 Operator Login
+                 Log In
               </Link>
            </div>
 
            <div className="grid grid-cols-3 gap-10 pt-20">
               <div className="space-y-1">
                  <div className="text-3xl font-black text-white italic">2,200+</div>
-                 <div className="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider">Instruments</div>
+                 <div className="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider">Stocks Tracked</div>
               </div>
               <div className="space-y-1">
                  <div className="text-3xl font-black text-[var(--primary-glow)] italic">64.2%</div>
-                 <div className="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider">Model Accuracy</div>
+                 <div className="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider">Recent Hit Rate</div>
               </div>
               <div className="space-y-1">
                  <div className="text-3xl font-black text-white italic">0.2ms</div>
-                 <div className="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider">Execution Alpha</div>
+                 <div className="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider">Signal Latency</div>
               </div>
            </div>
         </div>

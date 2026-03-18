@@ -1,50 +1,57 @@
 'use client'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import axios from 'axios'
 import { useAuth } from '../../lib/auth'
 import { getCompanyName, isValidNiftySymbol } from '../../lib/supabase'
 
+type CompanyRecommendation = {
+  symbol: string
+  recommendation: 'BUY' | 'SELL' | 'HOLD'
+  confidence: number
+  buy_prob?: number
+  sell_prob?: number
+  risk_score?: number
+  last_price?: number
+  last_date?: string
+}
+
 export default function CompanyDetail() {
   const router = useRouter()
   const { symbol } = router.query as { symbol?: string }
   const { user, loading: authLoading } = useAuth()
-  const [company, setCompany] = useState<any>(null)
-  const [recommendation, setRecommendation] = useState<any>(null)
+
+  const [company, setCompany] = useState<{ symbol: string; name: string } | null>(null)
+  const [recommendation, setRecommendation] = useState<CompanyRecommendation | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   useEffect(() => {
-    if (!symbol) return
-    if (authLoading) return
+    if (!symbol || authLoading) return
 
     const loadData = async () => {
       try {
         setLoading(true)
         setError('')
 
-        // Validate symbol
         if (!isValidNiftySymbol(symbol)) {
-          setError('Invalid stock symbol. Only NSE listed stocks are supported.')
+          setError('Invalid stock symbol. Use an NSE symbol like RELIANCE.NS.')
           return
         }
 
-        // Fetch recommendation for this symbol
         const recRes = await axios.get(`${apiUrl}/api/recommendations?symbol=${symbol}`)
-        const rec = recRes.data[0] || null
+        const rec = (recRes.data?.[0] || null) as CompanyRecommendation | null
         setRecommendation(rec)
 
-        // Set company info
         setCompany({
           symbol: symbol.toUpperCase(),
           name: getCompanyName(symbol),
-          ...rec,
         })
       } catch (err) {
         console.error('Failed to load company data:', err)
-        setError('Failed to load company data')
+        setError('Failed to load company data. Please try again.')
       } finally {
         setLoading(false)
       }
@@ -53,156 +60,183 @@ export default function CompanyDetail() {
     loadData()
   }, [symbol, authLoading])
 
+  const signalColor = useMemo(() => {
+    if (recommendation?.recommendation === 'BUY') return 'var(--status-buy)'
+    if (recommendation?.recommendation === 'SELL') return 'var(--status-sell)'
+    return 'var(--text-secondary)'
+  }, [recommendation])
+
   if (authLoading || loading) {
-    return <div className="container"><p>Loading...</p></div>
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center" style={{ gap: '0.9rem' }}>
+        <div className="animate-spin" style={{ width: '2.75rem', height: '2.75rem', border: '4px solid var(--slate-200)', borderTopColor: 'var(--primary-500)', borderRadius: '50%' }} />
+        <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Loading stock details...</span>
+      </div>
+    )
   }
 
   if (error) {
-    return <div className="container"><div style={{ color: '#ef4444' }}>{error}</div></div>
+    return (
+      <div className="min-h-screen">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8" style={{ maxWidth: '1000px', paddingBottom: '2.5rem' }}>
+          <div style={panelStyle}>
+            <p style={{ ...messageStyle, color: '#fecaca', borderColor: 'rgba(239,68,68,0.35)', background: 'rgba(127,29,29,0.2)' }}>{error}</p>
+            <Link href="/dashboard" style={secondaryActionStyle}>Back to dashboard</Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (!company) {
-    return <div className="container"><p>Company not found</p></div>
+    return (
+      <div className="min-h-screen">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8" style={{ maxWidth: '1000px', paddingBottom: '2.5rem' }}>
+          <div style={panelStyle}>
+            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Company not found.</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
-  const recColor = recommendation?.recommendation === 'BUY' ? 'var(--slate-800)' : recommendation?.recommendation === 'SELL' ? 'var(--black)' : 'var(--slate-400)'
-  const recBg = recommendation?.recommendation === 'BUY' ? 'var(--slate-100)' : recommendation?.recommendation === 'SELL' ? 'var(--slate-200)' : 'var(--slate-50)'
-
   return (
-    <div className="animate-in" style={{ backgroundColor: 'var(--skeuo-bg)', minHeight: '100vh', padding: '2rem 1rem' }}>
-      <div className="container" style={{ maxWidth: 1000 }}>
-        {/* Header Section */}
-        <div style={{ marginBottom: '3.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '2rem' }}>
-          <div>
-            <h1 style={{
-              margin: 0,
-              fontSize: '2.75rem',
-              fontWeight: 900,
-              color: 'var(--slate-800)',
-              textShadow: '1px 1px 0px white',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '1rem'
-            }}>
-              <span className="skeuo-knob" style={{ width: '40px', height: '40px' }}></span>
-              {company.name}
-            </h1>
-            <p style={{ margin: '0.5rem 0 0 0', color: 'var(--slate-500)', fontSize: '1.25rem', fontWeight: 600, letterSpacing: '0.05em' }}>
-              <span className="skeuo-recessed" style={{ padding: '0.2rem 0.8rem', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>{company.symbol}</span>
-            </p>
-          </div>
-          <div className="skeuo-recessed" style={{ padding: '0.6rem 1.2rem', borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 800, color: 'var(--slate-500)', fontSize: '0.8rem' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--slate-400)' }}></span>
-            ASSET DATA STREAM v2.1
-          </div>
-        </div>
-
-        {/* Primary Stats Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', marginBottom: '3rem' }}>
-          <div className="skeuo-card">
-            <span style={{ fontSize: '0.7rem', fontWeight: 900, color: 'var(--slate-400)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>MARKET VALUATION</span>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginTop: '0.5rem' }}>
-              <span style={{ fontSize: '2.5rem', fontWeight: 900, color: 'var(--slate-800)', fontFamily: 'var(--font-mono)' }}>₹{company.last_price?.toFixed(2) || 'N/A'}</span>
-              <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--slate-400)' }}>INR</span>
+    <div className="min-h-screen animate-in">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8" style={{ maxWidth: '1000px', paddingBottom: '2.5rem' }}>
+        <section style={panelStyle}>
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h1 style={titleStyle}>{company.name}</h1>
+              <p style={subtitleStyle}>{company.symbol}</p>
             </div>
-            {company.last_date && (
-              <div style={{ marginTop: '1.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--slate-400)', fontSize: '0.7rem', fontWeight: 700 }}>
-                <span style={{ fontSize: '0.9rem' }}>⏱️</span> Last Sync: {company.last_date}
-              </div>
-            )}
-          </div>
-
-          <div className="skeuo-card">
-            <span style={{ fontSize: '0.7rem', fontWeight: 900, color: 'var(--slate-400)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>NEURAL SIGNAL</span>
-            <div style={{ marginTop: '0.5rem' }}>
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.75rem 1.5rem',
-                background: 'var(--skeuo-bg)',
-                boxShadow: 'var(--skeuo-inset-shadow)',
-                borderRadius: '8px',
-                fontSize: '1.75rem',
-                fontWeight: 900,
-                color: recColor
-              }}>
-                <span style={{ width: '14px', height: '14px', borderRadius: '50%', background: recColor, boxShadow: `0 0 10px ${recColor}` }}></span>
-                {recommendation?.recommendation || 'NEUTRAL'}
-              </div>
-            </div>
-            <p style={{ margin: '1rem 0 0 0', fontSize: '0.8rem', fontWeight: 700, color: 'var(--slate-500)' }}>Execution Protocol Threshold reached.</p>
-          </div>
-
-          <div className="skeuo-card">
-            <span style={{ fontSize: '0.7rem', fontWeight: 900, color: 'var(--slate-400)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>ANALYSIS CONFIDENCE</span>
-            <div style={{ marginTop: '0.5rem' }}>
-              <span style={{ fontSize: '2.5rem', fontWeight: 900, color: 'var(--slate-800)', fontFamily: 'var(--font-mono)' }}>
-                {recommendation?.confidence ? `${(recommendation.confidence * 100).toFixed(1)}%` : '---'}
-              </span>
-            </div>
-            <div className="skeuo-progress-container" style={{ marginTop: '1rem', height: '12px' }}>
-              <div className="skeuo-progress-bar" style={{ width: `${(recommendation?.confidence || 0) * 100}%`, background: 'var(--slate-800)' }}></div>
+            <div className="flex gap-2">
+              <Link href="/dashboard" style={secondaryActionStyle}>Dashboard</Link>
+              <Link href="/portfolio" style={secondaryActionStyle}>Portfolio</Link>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Detailed Analysis Panel */}
-        {recommendation ? (
-          <div className="skeuo-card" style={{ marginBottom: '3rem' }}>
-            <h3 style={{ margin: '0 0 2rem 0', fontSize: '1.25rem', fontWeight: 900, color: 'var(--slate-700)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <span style={{ fontSize: '1.5rem' }}>🧠</span> NEURAL MATRIX OUTPUT
-            </h3>
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4" style={{ marginBottom: '1rem' }}>
+          <StatCard label="Current Price" value={recommendation?.last_price ? `₹${recommendation.last_price.toFixed(2)}` : '-'} />
+          <StatCard label="Signal" value={recommendation?.recommendation || 'N/A'} valueColor={signalColor} />
+          <StatCard label="Confidence" value={recommendation?.confidence ? `${(recommendation.confidence * 100).toFixed(1)}%` : '-'} />
+        </section>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-              {[
-                { label: 'Primary Vector', val: recommendation.recommendation || 'HOLD', color: 'var(--slate-800)' },
-                { label: 'Quantum Weight', val: `${(recommendation.confidence * 100).toFixed(1)}%`, color: 'var(--slate-700)' },
-                { label: 'Buy Momentum', val: `${((recommendation.buy_prob || 0) * 100).toFixed(1)}%`, color: 'var(--slate-600)' },
-                { label: 'Sell Pressure', val: `${((recommendation.sell_prob || 0) * 100).toFixed(1)}%`, color: 'var(--black)' },
-                { label: 'Temporal Ref', val: recommendation.last_date || 'N/A', color: 'var(--slate-500)' },
-              ].map((item, i) => (
-                <div key={i} className="skeuo-recessed" style={{ padding: '1.25rem' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 900, color: 'var(--slate-400)', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: '0.5rem' }}>{item.label}</span>
-                  <span style={{ fontSize: '1.1rem', fontWeight: 900, color: item.color, fontFamily: 'var(--font-mono)' }}>{item.val}</span>
-                </div>
-              ))}
+        <section style={panelStyle}>
+          <h2 style={panelTitleStyle}>Signal breakdown</h2>
+          {recommendation ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" style={{ marginTop: '0.9rem' }}>
+              <StatCard label="Buy Probability" value={`${((recommendation.buy_prob || 0) * 100).toFixed(1)}%`} compact />
+              <StatCard label="Sell Probability" value={`${((recommendation.sell_prob || 0) * 100).toFixed(1)}%`} compact />
+              <StatCard label="Risk Score" value={recommendation.risk_score?.toFixed(2) || '-'} compact />
+              <StatCard label="Last Updated" value={recommendation.last_date || '-'} compact />
             </div>
-          </div>
-        ) : (
-          <div className="skeuo-recessed" style={{ margin: '0 0 3rem 0', padding: '5rem', textAlign: 'center' }}>
-            <span style={{ fontSize: '3rem', display: 'block', marginBottom: '1.5rem', opacity: 0.3 }}>🔎</span>
-            <p style={{ fontWeight: 800, color: 'var(--slate-400)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Recommendation Matrix Offline for {company.symbol}</p>
-          </div>
-        )}
+          ) : (
+            <p style={{ marginTop: '0.9rem', color: 'var(--text-secondary)' }}>No recommendation data is available right now.</p>
+          )}
+        </section>
 
-        {/* Tactical Actions */}
         {user && (
-          <div className="skeuo-card" style={{ background: 'linear-gradient(135deg, white 0%, var(--skeuo-bg) 100%)', border: '2px solid var(--slate-300)' }}>
-            <div className="flex justify-between items-center flex-wrap gap-6">
+          <section style={panelStyle}>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: 'var(--slate-800)' }}>PORTFOLIO INTEGRATION</h3>
-                <p style={{ margin: '0.5rem 0 0 0', color: 'var(--slate-500)', fontWeight: 600 }}>Execute this asset to your active terminal watchlist.</p>
+                <h2 style={panelTitleStyle}>Add to portfolio</h2>
+                <p style={{ marginTop: '0.35rem', color: 'var(--text-secondary)' }}>Send this stock to your portfolio add form with one click.</p>
               </div>
-              <Link
-                href={`/portfolio?add=${symbol}`}
-                className="skeuo-button"
-                style={{
-                  padding: '1.25rem 2.5rem',
-                  backgroundColor: 'var(--slate-800)',
-                  color: 'white',
-                  fontSize: '1rem',
-                  fontWeight: 900,
-                  textDecoration: 'none',
-                  background: 'linear-gradient(180deg, var(--slate-800) 0%, var(--black) 100%)'
-                }}
-              >
-                DEPLOY TO VAULT
+              <Link href={`/portfolio?add=${company.symbol}`} style={primaryActionLinkStyle}>
+                Add {company.symbol.replace('.NS', '')}
               </Link>
             </div>
-          </div>
+          </section>
         )}
       </div>
     </div>
   )
+}
+
+function StatCard({
+  label,
+  value,
+  valueColor,
+  compact,
+}: {
+  label: string
+  value: string
+  valueColor?: string
+  compact?: boolean
+}) {
+  return (
+    <div style={{ ...statCardStyle, padding: compact ? '0.8rem' : '1rem' }}>
+      <p style={{ margin: 0, color: 'var(--text-muted)', fontWeight: 700, fontSize: '0.78rem' }}>{label}</p>
+      <p style={{ margin: '0.32rem 0 0', color: valueColor || 'var(--text-primary)', fontWeight: 900, fontSize: compact ? '1.1rem' : '1.34rem' }}>{value}</p>
+    </div>
+  )
+}
+
+const panelStyle: React.CSSProperties = {
+  border: '1px solid var(--border-glass)',
+  borderRadius: '16px',
+  background: 'rgba(12, 17, 26, 0.72)',
+  padding: '1rem',
+  marginBottom: '1rem',
+}
+
+const statCardStyle: React.CSSProperties = {
+  border: '1px solid var(--border-glass)',
+  borderRadius: '16px',
+  background: 'rgba(12, 17, 26, 0.72)',
+}
+
+const titleStyle: React.CSSProperties = {
+  margin: 0,
+  color: 'var(--text-primary)',
+  fontSize: '1.72rem',
+  fontWeight: 900,
+}
+
+const subtitleStyle: React.CSSProperties = {
+  marginTop: '0.36rem',
+  color: 'var(--text-secondary)',
+  fontFamily: 'var(--font-mono)',
+  fontWeight: 700,
+}
+
+const panelTitleStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: '1.02rem',
+  fontWeight: 800,
+  color: 'var(--text-primary)',
+}
+
+const messageStyle: React.CSSProperties = {
+  borderRadius: '10px',
+  borderWidth: '1px',
+  borderStyle: 'solid',
+  padding: '0.68rem 0.8rem',
+  fontWeight: 700,
+  fontSize: '0.88rem',
+  marginBottom: '0.8rem',
+}
+
+const secondaryActionStyle: React.CSSProperties = {
+  textDecoration: 'none',
+  borderRadius: '10px',
+  border: '1px solid var(--border-glass)',
+  background: 'rgba(15,23,42,0.6)',
+  color: 'var(--text-primary)',
+  padding: '0.52rem 0.75rem',
+  cursor: 'pointer',
+  fontWeight: 700,
+  fontSize: '0.82rem',
+}
+
+const primaryActionLinkStyle: React.CSSProperties = {
+  textDecoration: 'none',
+  borderRadius: '10px',
+  border: '1px solid rgba(0,255,204,0.35)',
+  background: 'rgba(0,255,204,0.14)',
+  color: 'var(--primary-glow)',
+  padding: '0.52rem 0.8rem',
+  fontWeight: 800,
+  fontSize: '0.84rem',
 }

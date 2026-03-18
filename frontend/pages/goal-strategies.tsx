@@ -1,237 +1,370 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import axios from 'axios'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-type StrategyType = 'conservative' | 'moderate' | 'aggressive';
+type StrategyType = 'conservative' | 'moderate' | 'aggressive'
 
 interface Recommendation {
-  symbol: string;
-  date: string;
-  close: number;
-  buy_prob: number;
-  confidence: number;
-  weight: number;
-  allocation_inr: number | string;
+  symbol: string
+  date: string
+  close: number
+  buy_prob: number
+  confidence: number
+  weight: number
 }
 
 interface Strategy {
-  name: string;
-  target_return: string;
-  horizon: string;
-  description: string;
-  risk_level: string;
+  name: string
+  target_return: string
+  horizon: string
+  description: string
+  risk_level: string
 }
 
-const formatINR = (value: number | string): string => {
-  if (typeof value === 'string') return value;
-  return new Intl.NumberFormat('en-IN', {
+const formatINR = (value: number): string =>
+  new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(value);
-};
-
-const formatPct = (value: number): string => `${value.toFixed(1)}%`;
-
-const getRiskClass = (risk: string) => {
-  switch (risk) {
-    case 'Low': return 'pill pill-green';
-    case 'Medium': return 'pill pill-yellow';
-    case 'High': return 'pill pill-red';
-    default: return 'pill';
-  }
-};
-
-const getConfidenceClass = (confidence: number) => {
-  if (confidence >= 60) return 'muted';
-  if (confidence >= 40) return 'muted';
-  return 'muted';
-};
+    maximumFractionDigits: 0,
+  }).format(value)
 
 export default function GoalStrategiesPage() {
-  const [strategies, setStrategies] = useState<Record<string, Strategy>>({});
-  const [selectedStrategy, setSelectedStrategy] = useState<StrategyType>('aggressive');
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [capital, setCapital] = useState<number>(1200000);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [best, setBest] = useState<{ recommended?: StrategyType; evaluations?: any; generated_at?: string } | null>(null);
-  const [bestLoading, setBestLoading] = useState<boolean>(true);
+  const [strategies, setStrategies] = useState<Record<string, Strategy>>({})
+  const [selectedStrategy, setSelectedStrategy] = useState<StrategyType>('aggressive')
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([])
+  const [capital, setCapital] = useState<number>(1200000)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [best, setBest] = useState<{ recommended?: StrategyType } | null>(null)
+  const [bestLoading, setBestLoading] = useState<boolean>(true)
 
   useEffect(() => {
     const fetchStrategies = async () => {
       try {
-        const res = await axios.get(`${API_BASE}/api/goal_strategies`);
-        setStrategies(res.data);
+        const res = await axios.get(`${API_BASE}/api/goal_strategies`)
+        setStrategies(res.data)
       } catch (err) {
-        console.error('Failed to fetch strategies:', err);
+        console.error('Failed to fetch strategies:', err)
       }
-    };
-    fetchStrategies();
-  }, []);
+    }
+    fetchStrategies()
+  }, [])
 
   useEffect(() => {
     const fetchBest = async () => {
-      setBestLoading(true);
+      setBestLoading(true)
       try {
-        const res = await axios.get(`${API_BASE}/api/goal_best`);
-        setBest(res.data);
+        const res = await axios.get(`${API_BASE}/api/goal_best`)
+        setBest(res.data)
       } catch (err) {
-        console.error('Failed to fetch best strategy:', err);
+        console.error('Failed to fetch best strategy:', err)
       } finally {
-        setBestLoading(false);
+        setBestLoading(false)
       }
-    };
-    fetchBest();
-  }, []);
+    }
+    fetchBest()
+  }, [])
 
   useEffect(() => {
     const fetchRecommendations = async () => {
-      setLoading(true);
-      setError(null);
+      setLoading(true)
+      setError(null)
       try {
-        const res = await axios.get(`${API_BASE}/api/goal_recommendations/${selectedStrategy}`);
-        setRecommendations(res.data);
+        const res = await axios.get(`${API_BASE}/api/goal_recommendations/${selectedStrategy}`)
+        setRecommendations(res.data)
       } catch (err) {
-        setError(`Failed to load ${selectedStrategy} recommendations. Please train the model first.`);
-        console.error(err);
+        setError(`Failed to load ${selectedStrategy} recommendations. Train models and try again.`)
+        console.error(err)
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
-    fetchRecommendations();
-  }, [selectedStrategy]);
+    }
+    fetchRecommendations()
+  }, [selectedStrategy])
 
-  const computedRecs = recommendations.map((rec) => ({
-    ...rec,
-    allocationComputed: rec.weight * capital
-  }));
-  const totalAllocation = computedRecs.reduce((sum, rec) => sum + (rec.allocationComputed || 0), 0);
+  const computedRecs = useMemo(
+    () =>
+      recommendations.map((rec) => ({
+        ...rec,
+        allocationComputed: rec.weight * capital,
+      })),
+    [recommendations, capital]
+  )
+
+  const totalAllocation = useMemo(
+    () => computedRecs.reduce((sum, rec) => sum + rec.allocationComputed, 0),
+    [computedRecs]
+  )
 
   return (
-    <div className="container">
-      <div className="card section" style={{ marginBottom: 16 }}>
-        <h2>Recommended Approach</h2>
-        {bestLoading ? (
-          <p className="muted">Evaluating strategies...</p>
-        ) : best?.recommended ? (
-          <div className="row space-between">
+    <div className="min-h-screen animate-in">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8" style={{ maxWidth: '1240px', paddingBottom: '2.5rem' }}>
+        <section style={panelStyle}>
+          <div className="flex items-start justify-between flex-wrap gap-3">
             <div>
-              <p className="muted">Based on expected return and confidence</p>
-              <div style={{ fontSize: 18, fontWeight: 700 }}>
-                {strategies[best.recommended]?.name} ({best.recommended})
-              </div>
+              <h1 style={titleStyle}>Goal Strategies</h1>
+              <p style={subtitleStyle}>Compare investment styles and get strategy-specific allocations.</p>
             </div>
-            <div className="row" style={{ gap: 12 }}>
-              <button className="btn btn-primary" onClick={() => setSelectedStrategy(best!.recommended as StrategyType)}>
-                View Best Recommendations
+            <div className="flex gap-2">
+              <Link href="/goal-optimizer" style={secondaryActionStyle}>Goal Optimizer</Link>
+              <Link href="/portfolio" style={secondaryActionStyle}>Portfolio</Link>
+            </div>
+          </div>
+        </section>
+
+        <section style={panelStyle}>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h2 style={panelTitleStyle}>Recommended approach</h2>
+            {bestLoading ? (
+              <span style={chipStyle}>Evaluating...</span>
+            ) : best?.recommended ? (
+              <span style={chipStyle}>Best: {best.recommended}</span>
+            ) : (
+              <span style={chipStyle}>No recommendation yet</span>
+            )}
+          </div>
+
+          {best?.recommended && (
+            <div className="flex justify-end" style={{ marginTop: '0.8rem' }}>
+              <button onClick={() => setSelectedStrategy(best.recommended!)} style={primaryActionStyle}>
+                View best strategy
               </button>
             </div>
-          </div>
-        ) : (
-          <p className="muted">No recommended strategy available yet. Train models first.</p>
-        )}
-      </div>
-      <div className="section">
-        <h1>Goal-Based Investment Strategies</h1>
-        <p className="muted">Choose your investment goal and capital; allocations recompute live.</p>
-      </div>
+          )}
+        </section>
 
-      <div className="grid grid-3 section">
-        {Object.entries(strategies).map(([key, strategy]) => (
-          <button
-            key={key}
-            onClick={() => setSelectedStrategy(key as StrategyType)}
-            className={selectedStrategy === key ? 'strategy-card strategy-card--active' : 'strategy-card'}
-          >
-            <div>
-              <h3>{strategy.name}</h3>
-              <div className={getRiskClass(strategy.risk_level)} style={{ marginBottom: 8 }}>{strategy.risk_level} Risk</div>
-              <div>
-                <p><strong>Target:</strong> {strategy.target_return}</p>
-                <p><strong>Horizon:</strong> {strategy.horizon}</p>
-                <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>{strategy.description}</p>
-              </div>
-            </div>
-          </button>
-        ))}
-      </div>
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-3" style={{ marginBottom: '1rem' }}>
+          {Object.entries(strategies).map(([key, strategy]) => {
+            const selected = selectedStrategy === key
+            return (
+              <button
+                key={key}
+                onClick={() => setSelectedStrategy(key as StrategyType)}
+                style={{
+                  textAlign: 'left',
+                  borderRadius: '12px',
+                  border: selected ? '1px solid rgba(0,255,204,0.35)' : '1px solid var(--border-glass)',
+                  background: selected ? 'rgba(0,255,204,0.1)' : 'rgba(15,23,42,0.6)',
+                  color: 'var(--text-primary)',
+                  padding: '0.9rem',
+                  cursor: 'pointer',
+                }}
+              >
+                <strong style={{ textTransform: 'capitalize' }}>{strategy.name}</strong>
+                <div style={{ color: 'var(--text-secondary)', marginTop: '0.38rem', fontSize: '0.84rem' }}>{strategy.description}</div>
+                <div className="flex items-center justify-between" style={{ marginTop: '0.65rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  <span>{strategy.risk_level} risk</span>
+                  <span>{strategy.horizon}</span>
+                </div>
+              </button>
+            )
+          })}
+        </section>
 
-      <div className="card">
-        <div className="row space-between" style={{ marginBottom: 16 }}>
-          <h2>{strategies[selectedStrategy]?.name} Strategy Recommendations</h2>
-          <div className="row" style={{ gap: 16 }}>
-            <div className="row">
-              <label htmlFor="capital" className="muted">Investment</label>
-              <input id="capital" type="number" className="input" min={100000} step={10000} value={capital}
-                onChange={(e) => setCapital(Math.max(0, Number(e.target.value) || 0))} />
-            </div>
-            <div className="text-right">
-              <div className="muted" style={{ fontSize: 12 }}>Total Allocation</div>
-              <div style={{ fontWeight: 700 }}>{formatINR(totalAllocation)}</div>
+        <section style={panelStyle}>
+          <div className="flex items-center justify-between gap-3 flex-wrap" style={{ marginBottom: '0.9rem' }}>
+            <h2 style={panelTitleStyle}>{strategies[selectedStrategy]?.name || 'Selected'} recommendations</h2>
+            <div className="flex items-center gap-2">
+              <label htmlFor="capital" style={labelStyle}>Capital</label>
+              <input
+                id="capital"
+                type="number"
+                min={100000}
+                step={10000}
+                value={capital}
+                onChange={(e) => setCapital(Math.max(0, Number(e.target.value) || 0))}
+                style={inputStyle}
+              />
             </div>
           </div>
-        </div>
 
-        {loading ? (
-          <div className="muted">Loading recommendations...</div>
-        ) : error ? (
-          <div className="card" style={{ border: '1px solid #fee2e2', background: '#fff1f2' }}>
-            <p style={{ color: '#7f1d1d' }}>{error}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3" style={{ marginBottom: '0.9rem' }}>
+            <StatCard label="Total Allocation" value={formatINR(totalAllocation)} />
+            <StatCard label="Target Return" value={strategies[selectedStrategy]?.target_return || '-'} valueColor="var(--primary-glow)" />
+            <StatCard label="Horizon" value={strategies[selectedStrategy]?.horizon || '-'} />
           </div>
-        ) : computedRecs.length === 0 ? (
-          <div className="muted">No recommendations available for this strategy.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Rank</th>
-                  <th>Symbol</th>
-                  <th className="text-right">Price</th>
-                  <th className="text-right">Confidence</th>
-                  <th className="text-right">Weight</th>
-                  <th className="text-right">Allocation</th>
-                </tr>
-              </thead>
-              <tbody>
-                {computedRecs.map((rec, idx) => (
-                  <tr key={idx}>
-                    <td>{idx + 1}</td>
-                    <td><strong style={{ color: '#4338ca' }}>{rec.symbol.replace('.NS', '')}</strong></td>
-                    <td className="text-right">{formatINR(rec.close)}</td>
-                    <td className={`text-right ${getConfidenceClass(rec.confidence)}`}>{formatPct(rec.confidence)}</td>
-                    <td className="text-right">{formatPct(rec.weight * 100)}</td>
-                    <td className="text-right" style={{ fontWeight: 700 }}>{formatINR(rec.allocationComputed || 0)}</td>
+
+          {loading ? (
+            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Loading recommendations...</p>
+          ) : error ? (
+            <div style={errorStyle}>{error}</div>
+          ) : computedRecs.length === 0 ? (
+            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>No recommendations available for this strategy.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr style={tableHeadRowStyle}>
+                    <th style={thLeftStyle}>Rank</th>
+                    <th style={thLeftStyle}>Symbol</th>
+                    <th style={thRightStyle}>Price</th>
+                    <th style={thRightStyle}>Confidence</th>
+                    <th style={thRightStyle}>Weight</th>
+                    <th style={thRightStyle}>Allocation</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody>
+                  {computedRecs.map((rec, idx) => (
+                    <tr key={`${rec.symbol}-${idx}`} style={tableBodyRowStyle}>
+                      <td style={tdLeftStyle}>{idx + 1}</td>
+                      <td style={tdLeftStyle}>{rec.symbol.replace('.NS', '')}</td>
+                      <td style={tdRightStyle}>{formatINR(rec.close)}</td>
+                      <td style={tdRightStyle}>{rec.confidence.toFixed(1)}%</td>
+                      <td style={tdRightStyle}>{(rec.weight * 100).toFixed(1)}%</td>
+                      <td style={tdRightStyle}>{formatINR(rec.allocationComputed)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </div>
-
-      {!loading && !error && computedRecs.length > 0 && (
-        <div className="card section">
-          <h3>Investment Timeline</h3>
-          <div className="grid grid-3">
-            <div className="card">
-              <div className="muted">Invest Today</div>
-              <div style={{ fontWeight: 700 }}>{new Date().toLocaleDateString('en-IN')}</div>
-            </div>
-            <div className="card">
-              <div className="muted">Expected Horizon</div>
-              <div style={{ fontWeight: 700 }}>{strategies[selectedStrategy]?.horizon}</div>
-            </div>
-            <div className="card">
-              <div className="muted">Target Return</div>
-              <div style={{ fontWeight: 700 }}>{strategies[selectedStrategy]?.target_return}</div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
-  );
+  )
+}
+
+function StatCard({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
+  return (
+    <div style={statCardStyle}>
+      <p style={{ margin: 0, color: 'var(--text-muted)', fontWeight: 700, fontSize: '0.78rem' }}>{label}</p>
+      <p style={{ margin: '0.32rem 0 0', color: valueColor || 'var(--text-primary)', fontWeight: 900, fontSize: '1.24rem' }}>{value}</p>
+    </div>
+  )
+}
+
+const panelStyle: React.CSSProperties = {
+  border: '1px solid var(--border-glass)',
+  borderRadius: '16px',
+  background: 'rgba(12, 17, 26, 0.72)',
+  padding: '1rem',
+  marginBottom: '1rem',
+}
+
+const statCardStyle: React.CSSProperties = {
+  border: '1px solid var(--border-glass)',
+  borderRadius: '12px',
+  background: 'rgba(15,23,42,0.6)',
+  padding: '0.8rem',
+}
+
+const errorStyle: React.CSSProperties = {
+  border: '1px solid rgba(239,68,68,0.35)',
+  background: 'rgba(127,29,29,0.2)',
+  color: '#fecaca',
+  borderRadius: '10px',
+  padding: '0.68rem 0.8rem',
+  fontWeight: 700,
+  fontSize: '0.88rem',
+}
+
+const titleStyle: React.CSSProperties = {
+  margin: 0,
+  color: 'var(--text-primary)',
+  fontSize: '1.72rem',
+  fontWeight: 900,
+}
+
+const subtitleStyle: React.CSSProperties = {
+  marginTop: '0.36rem',
+  color: 'var(--text-secondary)',
+}
+
+const panelTitleStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: '1.02rem',
+  fontWeight: 800,
+  color: 'var(--text-primary)',
+}
+
+const labelStyle: React.CSSProperties = {
+  color: 'var(--text-muted)',
+  fontSize: '0.8rem',
+  fontWeight: 700,
+}
+
+const chipStyle: React.CSSProperties = {
+  borderRadius: '999px',
+  border: '1px solid var(--border-glass)',
+  color: 'var(--text-muted)',
+  fontWeight: 700,
+  fontSize: '0.75rem',
+  padding: '0.36rem 0.7rem',
+}
+
+const primaryActionStyle: React.CSSProperties = {
+  borderRadius: '10px',
+  border: '1px solid rgba(0,255,204,0.35)',
+  background: 'rgba(0,255,204,0.14)',
+  color: 'var(--primary-glow)',
+  padding: '0.52rem 0.8rem',
+  cursor: 'pointer',
+  fontWeight: 800,
+  fontSize: '0.84rem',
+}
+
+const secondaryActionStyle: React.CSSProperties = {
+  textDecoration: 'none',
+  borderRadius: '10px',
+  border: '1px solid var(--border-glass)',
+  background: 'rgba(15,23,42,0.6)',
+  color: 'var(--text-primary)',
+  padding: '0.52rem 0.75rem',
+  cursor: 'pointer',
+  fontWeight: 700,
+  fontSize: '0.82rem',
+}
+
+const inputStyle: React.CSSProperties = {
+  width: '150px',
+  padding: '0.52rem 0.65rem',
+  borderRadius: '10px',
+  border: '1px solid var(--border-glass)',
+  background: 'rgba(15,23,42,0.7)',
+  color: 'var(--text-primary)',
+  outline: 'none',
+  fontWeight: 600,
+}
+
+const tableHeadRowStyle: React.CSSProperties = {
+  borderBottom: '1px solid var(--border-glass)',
+}
+
+const tableBodyRowStyle: React.CSSProperties = {
+  borderBottom: '1px solid rgba(255,255,255,0.06)',
+}
+
+const thLeftStyle: React.CSSProperties = {
+  textAlign: 'left',
+  padding: '0.65rem 0.2rem',
+  color: 'var(--text-muted)',
+  fontWeight: 700,
+  fontSize: '0.75rem',
+}
+
+const thRightStyle: React.CSSProperties = {
+  textAlign: 'right',
+  padding: '0.65rem 0.2rem',
+  color: 'var(--text-muted)',
+  fontWeight: 700,
+  fontSize: '0.75rem',
+}
+
+const tdLeftStyle: React.CSSProperties = {
+  textAlign: 'left',
+  padding: '0.62rem 0.2rem',
+  color: 'var(--text-primary)',
+  fontWeight: 700,
+  fontSize: '0.86rem',
+}
+
+const tdRightStyle: React.CSSProperties = {
+  textAlign: 'right',
+  padding: '0.62rem 0.2rem',
+  color: 'var(--text-secondary)',
+  fontWeight: 700,
+  fontSize: '0.84rem',
 }

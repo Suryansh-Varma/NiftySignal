@@ -39,7 +39,7 @@ export default function Signup() {
   }
 
   return (
-    <div className="animate-in" style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: 'minmax(400px, 1fr) 1fr', backgroundColor: 'var(--skeuo-bg)' }}>
+    <div className="animate-in" style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) 1fr', backgroundColor: 'var(--skeuo-bg)' }}>
       {/* Left side - Terminal Configuration */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
         <div className="skeuo-card" style={{ width: '100%', maxWidth: '540px', padding: '4rem' }}>
@@ -48,8 +48,8 @@ export default function Signup() {
           </Link>
 
           <div style={{ marginBottom: '3rem' }}>
-            <h2 style={{ fontSize: '2.5rem', fontWeight: 900, color: 'var(--slate-800)', marginBottom: '0.5rem' }}>Initialize Account</h2>
-            <p style={{ color: 'var(--slate-500)', fontWeight: 700, fontSize: '0.9rem', letterSpacing: '0.05em' }}>NEW OPERATOR REGISTRATION</p>
+            <h2 style={{ fontSize: '2.5rem', fontWeight: 900, color: 'var(--slate-800)', marginBottom: '0.5rem' }}>Create account</h2>
+            <p style={{ color: 'var(--slate-500)', fontWeight: 700, fontSize: '0.9rem', letterSpacing: '0.05em' }}>SET UP YOUR PROFILE</p>
           </div>
 
           {error && (
@@ -66,7 +66,7 @@ export default function Signup() {
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
             <div className="flex flex-col gap-2">
-              <label style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--slate-500)', letterSpacing: '0.1em' }}>OPERATOR NAME</label>
+              <label style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--slate-500)', letterSpacing: '0.1em' }}>FULL NAME</label>
               <div className="skeuo-recessed" style={{ padding: '0 1rem', display: 'flex', alignItems: 'center', gap: '1rem', height: '56px' }}>
                 <span style={{ opacity: 0.4 }}>👤</span>
                 <input
@@ -81,7 +81,7 @@ export default function Signup() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <label style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--slate-500)', letterSpacing: '0.1em' }}>COMMUNICATION NODE (EMAIL)</label>
+              <label style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--slate-500)', letterSpacing: '0.1em' }}>EMAIL</label>
               <div className="skeuo-recessed" style={{ padding: '0 1rem', display: 'flex', alignItems: 'center', gap: '1rem', height: '56px' }}>
                 <span style={{ opacity: 0.4 }}>📧</span>
                 <input
@@ -97,7 +97,7 @@ export default function Signup() {
 
             <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
               <div className="flex flex-col gap-2">
-                <label style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--slate-500)', letterSpacing: '0.1em' }}>ACCESS CODE</label>
+                <label style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--slate-500)', letterSpacing: '0.1em' }}>PASSWORD</label>
                 <div className="skeuo-recessed" style={{ padding: '0 1rem', display: 'flex', alignItems: 'center', gap: '1rem', height: '56px' }}>
                   <input
                     type="password"
@@ -110,7 +110,7 @@ export default function Signup() {
                 </div>
               </div>
               <div className="flex flex-col gap-2">
-                <label style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--slate-500)', letterSpacing: '0.1em' }}>VERIFY CODE</label>
+                <label style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--slate-500)', letterSpacing: '0.1em' }}>CONFIRM PASSWORD</label>
                 <div className="skeuo-recessed" style={{ padding: '0 1rem', display: 'flex', alignItems: 'center', gap: '1rem', height: '56px' }}>
                   <input
                     type="password"
@@ -134,12 +134,12 @@ export default function Signup() {
               color: 'white',
               boxShadow: 'var(--skeuo-shadow), 0 10px 20px rgba(79, 70, 229, 0.2)'
             }}>
-              {loading ? 'CALIBRATING...' : 'INITIALIZE TERMINAL'}
+              {loading ? 'CREATING ACCOUNT...' : 'CREATE ACCOUNT'}
             </button>
           </form>
 
           <p style={{ fontSize: '0.75rem', color: 'var(--slate-400)', textAlign: 'center', marginTop: '2rem', fontWeight: 700 }}>
-            BY INITIALIZING, YOU CONCUR WITH OUR CORE PROTOCOLS (TERMS)
+            BY CONTINUING, YOU AGREE TO THE PLATFORM TERMS
           </p>
 
           <div className="flex items-center gap-4" style={{ margin: '3rem 0' }}>
@@ -149,7 +149,7 @@ export default function Signup() {
           </div>
 
           <Link href="/login" style={{ textAlign: 'center', display: 'block' }} className="skeuo-button">
-            RESUME EXISTING SESSION
+            LOG IN INSTEAD
           </Link>
         </div>
       </div>

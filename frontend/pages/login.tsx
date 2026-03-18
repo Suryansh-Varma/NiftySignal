@@ -76,8 +76,8 @@ export default function Login() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
         <div className="skeuo-card" style={{ width: '100%', maxWidth: '440px', padding: '3.5rem' }}>
           <div style={{ marginBottom: '3rem', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--slate-800)', marginBottom: '0.5rem' }}>Terminal Login</h2>
-            <p style={{ color: 'var(--slate-500)', fontWeight: 700, fontSize: '0.9rem', letterSpacing: '0.05em' }}>ESTABLISH IDENTITY PROTOCOL</p>
+            <h2 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--slate-800)', marginBottom: '0.5rem' }}>Welcome back</h2>
+            <p style={{ color: 'var(--slate-500)', fontWeight: 700, fontSize: '0.9rem', letterSpacing: '0.05em' }}>SIGN IN TO CONTINUE</p>
           </div>
 
           {error && (
@@ -88,7 +88,7 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
             <div className="flex flex-col gap-2">
-              <label style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--slate-500)', letterSpacing: '0.1em' }}>NEURAL ID (EMAIL)</label>
+              <label style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--slate-500)', letterSpacing: '0.1em' }}>EMAIL</label>
               <div className="skeuo-recessed" style={{ padding: '0 1rem', display: 'flex', alignItems: 'center', gap: '1rem', height: '56px' }}>
                 <span style={{ opacity: 0.4 }}>📧</span>
                 <input
@@ -97,13 +97,13 @@ export default function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   style={{ background: 'transparent', border: 'none', outline: 'none', width: '100%', fontSize: '1rem', color: 'var(--slate-800)', fontWeight: 600 }}
-                  placeholder="operator@vault.ai"
+                  placeholder="you@example.com"
                 />
               </div>
             </div>
 
             <div className="flex flex-col gap-2">
-              <label style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--slate-500)', letterSpacing: '0.1em' }}>ACCESS CODE</label>
+              <label style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--slate-500)', letterSpacing: '0.1em' }}>PASSWORD</label>
               <div className="skeuo-recessed" style={{ padding: '0 1rem', display: 'flex', alignItems: 'center', gap: '1rem', height: '56px' }}>
                 <span style={{ opacity: 0.4 }}>🔑</span>
                 <input
@@ -127,7 +127,7 @@ export default function Login() {
               color: 'white',
               boxShadow: 'var(--skeuo-shadow), 0 10px 20px rgba(79, 70, 229, 0.2)'
             }}>
-              {loading ? 'INITIALIZING...' : 'AUTHORIZE ACCESS'}
+              {loading ? 'SIGNING IN...' : 'SIGN IN'}
             </button>
           </form>
 
@@ -138,7 +138,7 @@ export default function Login() {
           </div>
 
           <Link href="/signup" style={{ textAlign: 'center', display: 'block' }} className="skeuo-button">
-            CREATE TERMINAL IDENTITY
+            CREATE NEW ACCOUNT
           </Link>
         </div>
       </div>
