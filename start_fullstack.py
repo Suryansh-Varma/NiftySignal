@@ -7,7 +7,8 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-import os
+import socket
+import requests
 
 print("\n" + "="*80)
 print("NIFTYSIGNAL TERMINAL STARTUP")
@@ -15,7 +16,35 @@ print("="*80)
 
 BASE_DIR = Path(__file__).parent
 FRONTEND_DIR = BASE_DIR / "frontend"
-API_SERVER_DIR = BASE_DIR / "app" / "api_server"
+API_SERVER_DIR = BASE_DIR / "api_server"
+
+if not API_SERVER_DIR.exists():
+    fallback_api_dir = BASE_DIR / "app" / "api_server"
+    if fallback_api_dir.exists():
+        API_SERVER_DIR = fallback_api_dir
+
+
+def is_port_open(host: str, port: int, timeout: float = 0.5) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def check_backend_health(url: str, attempts: int = 3) -> bool:
+    for attempt in range(1, attempts + 1):
+        try:
+            response = requests.get(url, timeout=(1, 1.5))
+            if response.status_code == 200:
+                return True
+        except requests.exceptions.RequestException:
+            pass
+
+        if attempt < attempts:
+            time.sleep(0.4)
+
+    return False
 
 # [1] Environment Verification
 print("\n[1] Checking Node.js...")
@@ -43,16 +72,18 @@ else:
 
 # [3] Backend Health Check
 print("\n[3] Checking Backend API...")
-import requests
 try:
-    response = requests.get("http://localhost:8000/api/health", timeout=2)
-    if response.status_code == 200:
-        print("    Backend is already running on port 8000")
+    if is_port_open("127.0.0.1", 8000) and check_backend_health("http://127.0.0.1:8000/api/health"):
+        print("    Backend is already running on port 8000 and healthy")
     else:
-        print("    Backend returned unexpected status")
+        print("    Backend not running - you need to start it separately")
+        print("    Run: cd app/api_server && python -m uvicorn main:app --port 8000")
 except requests.exceptions.RequestException:
     print("    Backend not running - you need to start it separately")
     print("    Run: cd app/api_server && python -m uvicorn main:app --port 8000")
+except KeyboardInterrupt:
+    print("\n    Health check interrupted by user")
+    sys.exit(130)
 
 # [4] Environment Setup
 print("\n[4] Checking Frontend Environment...")
@@ -71,7 +102,7 @@ print("\n" + "="*80)
 print("READY TO INITIALIZE!")
 print("="*80)
 
-print("\n📋 OPERATIONAL INSTRUCTIONS:")
+print("\nOPERATIONAL INSTRUCTIONS:")
 print("\n1. BACKEND:")
 print("   cd app/api_server")
 print("   python -m uvicorn main:app --reload --port 8000")
@@ -88,17 +119,36 @@ response = input("\nWould you like to start the production stack now? (y/n): ")
 
 if response.lower() == 'y':
     print("\n[Initializing Stack...]")
+
+    if not API_SERVER_DIR.exists():
+        print(f"\nERROR: Backend directory not found: {API_SERVER_DIR}")
+        print("Expected either './api_server' or './app/api_server'.")
+        sys.exit(1)
+
+    if not FRONTEND_DIR.exists():
+        print(f"\nERROR: Frontend directory not found: {FRONTEND_DIR}")
+        sys.exit(1)
     
     # Start backend
     print("\n1. Starting Backend API (Port 8000)...")
-    backend_cmd = f'cd {API_SERVER_DIR} && python -m uvicorn main:app --reload --port 8000'
-    subprocess.Popen(f'start cmd /k "{backend_cmd}"', shell=True)
+    backend_cmd = "python -m uvicorn main:app --reload --port 8000"
+    subprocess.Popen(
+        ["cmd", "/k", backend_cmd],
+        cwd=str(API_SERVER_DIR),
+        creationflags=subprocess.CREATE_NEW_CONSOLE,
+        shell=False,
+    )
     time.sleep(2)
     
     # Start Frontend
     print("2. Starting Frontend (Port 3000)...")
-    frontend_cmd = f'cd {FRONTEND_DIR} && npm run dev'
-    subprocess.Popen(f'start cmd /k "{frontend_cmd}"', shell=True)
+    frontend_cmd = "npm run dev"
+    subprocess.Popen(
+        ["cmd", "/k", frontend_cmd],
+        cwd=str(FRONTEND_DIR),
+        creationflags=subprocess.CREATE_NEW_CONSOLE,
+        shell=False,
+    )
     
     print("\n" + "="*80)
     print("NIFTYSIGNAL TERMINAL ENGAGED!")

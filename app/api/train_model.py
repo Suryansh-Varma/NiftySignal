@@ -13,7 +13,7 @@ from app.config import (
     DATA_PROCESSED_DIR as DATA_DIR,
     MODELS_DIR,
     RESULTS_DIR,
-    TradingConfig
+    TradingConfig,
 )
 from app.features.technical import prepare_features
 from app.signals.ml_signals import MLSignalGenerator
@@ -21,14 +21,17 @@ from app.backtest.strategy import SimpleBacktester
 
 # Set up logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 # Import enhanced features for accuracy improvement
 try:
-    from enhanced_features import calculate_enhanced_features, get_enhanced_feature_columns
+    from enhanced_features import (
+        calculate_enhanced_features,
+        get_enhanced_feature_columns,
+    )
+
     USE_ENHANCED_FEATURES = True
     logger.info("Enhanced features module loaded - using 38 features for training")
 except ImportError:
@@ -38,7 +41,7 @@ except ImportError:
 # Load the data from processed folder (canonical location)
 try:
     data_path = DATA_DIR / "universe_data.csv"
-    
+
     if not data_path.exists():
         error_msg = (
             f"Data file not found: {data_path}\n\n"
@@ -47,7 +50,7 @@ try:
             f"  2. python app/scripts/assemble_universe.py (to assemble from parquet files)"
         )
         raise FileNotFoundError(error_msg)
-    
+
     df = pd.read_csv(data_path)
     logger.info(f"Loaded data from {data_path} ({len(df)} rows)")
 except FileNotFoundError as e:
@@ -56,19 +59,25 @@ except FileNotFoundError as e:
 except Exception as e:
     logger.error(f"Error loading data: {e}")
     raise
-df['date'] = pd.to_datetime(df['date'])
+df["date"] = pd.to_datetime(df["date"])
 
 # Check data sufficiency before feature preparation
 total_rows = len(df)
-unique_symbols = df['symbol'].nunique()
+unique_symbols = df["symbol"].nunique()
 rows_per_symbol = total_rows / unique_symbols if unique_symbols > 0 else 0
 
-logger.info(f"Data summary: {total_rows} total rows, {unique_symbols} symbols, ~{rows_per_symbol:.1f} rows per symbol")
+logger.info(
+    f"Data summary: {total_rows} total rows, {unique_symbols} symbols, ~{rows_per_symbol:.1f} rows per symbol"
+)
 
 # Estimate minimum rows needed: Enhanced features need 200+ days for MA_200 and better accuracy
-min_rows_needed = 200 if USE_ENHANCED_FEATURES else max(50, 20, TradingConfig.FORWARD_DAYS) + 10
+min_rows_needed = (
+    200 if USE_ENHANCED_FEATURES else max(50, 20, TradingConfig.FORWARD_DAYS) + 10
+)
 if USE_ENHANCED_FEATURES:
-    logger.info(f"Using enhanced features - require {min_rows_needed} rows per symbol for better accuracy")
+    logger.info(
+        f"Using enhanced features - require {min_rows_needed} rows per symbol for better accuracy"
+    )
 if rows_per_symbol < min_rows_needed:
     error_msg = (
         f"Insufficient data for model training!\n"
@@ -88,10 +97,10 @@ if rows_per_symbol < min_rows_needed:
 
 # Prepare features and labels
 logger.info("Preparing features and labels...")
-X, y = prepare_features(
+X, y, _ = prepare_features(
     df,
     forward_days=TradingConfig.FORWARD_DAYS,
-    return_threshold=TradingConfig.RETURN_THRESHOLD
+    return_threshold=TradingConfig.RETURN_THRESHOLD,
 )
 
 # Store the feature columns used for training (important for predictions)
@@ -111,11 +120,13 @@ if len(X) == 0:
     raise ValueError(error_msg)
 
 # Initialize and train the model
-model = MLSignalGenerator(model_type='gradient_boost', use_risk_adjustment=True,
+model = MLSignalGenerator(
+    model_type="gradient_boost",
+    use_risk_adjustment=True,
     forward_days=TradingConfig.FORWARD_DAYS,
     return_threshold=TradingConfig.RETURN_THRESHOLD_STRICT,
     test_size=TradingConfig.TEST_SIZE,
-    random_state=TradingConfig.RANDOM_STATE
+    random_state=TradingConfig.RANDOM_STATE,
 )
 
 # Train and get metrics
@@ -128,9 +139,9 @@ except Exception as e:
 
 # Print model performance
 print("\nTraining Performance:")
-print(pd.DataFrame(train_metrics['classification_report']).T)
+print(pd.DataFrame(train_metrics["classification_report"]).T)
 print("\nTest Performance:")
-print(pd.DataFrame(test_metrics['classification_report']).T)
+print(pd.DataFrame(test_metrics["classification_report"]).T)
 
 # Get feature importance
 importance = pd.Series(model.feature_importance_).sort_values(ascending=False)
@@ -152,8 +163,8 @@ signals = model.predict(X)
 
 # Add signals back to the original data
 df_signals = df.copy()
-df_signals['signal'] = np.nan
-df_signals.loc[X.index, 'signal'] = signals
+df_signals["signal"] = np.nan
+df_signals.loc[X.index, "signal"] = signals
 
 # Run backtest with optimized parameters
 backtest = SimpleBacktester(
@@ -162,7 +173,7 @@ backtest = SimpleBacktester(
     stop_loss=TradingConfig.STOP_LOSS,
     take_profit=TradingConfig.TAKE_PROFIT,
     trailing_stop=TradingConfig.TRAILING_STOP,
-    min_confidence=TradingConfig.MIN_BUY_CONFIDENCE
+    min_confidence=TradingConfig.MIN_BUY_CONFIDENCE,
 )
 
 try:
@@ -193,35 +204,37 @@ latest_symbols = []
 latest_prices = []
 latest_dates = []
 
-for symbol in df['symbol'].unique():
-    symbol_data = df[df['symbol'] == symbol].copy()
+for symbol in df["symbol"].unique():
+    symbol_data = df[df["symbol"] == symbol].copy()
     if len(symbol_data) >= TradingConfig.MIN_DAYS_FOR_FEATURES:
-        symbol_data = symbol_data.sort_values('date')
+        symbol_data = symbol_data.sort_values("date")
         try:
             # Use the same feature columns as training
-            X_temp, _ = prepare_features(
+            X_temp, _, _ = prepare_features(
                 symbol_data,
                 feature_columns=TRAINING_FEATURE_COLUMNS,  # Use same features as training
                 forward_days=TradingConfig.FORWARD_DAYS,
-                return_threshold=TradingConfig.RETURN_THRESHOLD
+                return_threshold=TradingConfig.RETURN_THRESHOLD,
             )
         except Exception as e:
             logger.warning(f"Error preparing features for {symbol}: {e}")
             continue
-        
+
         if not X_temp.empty:
             # Ensure we only use the training feature columns
             missing_cols = set(TRAINING_FEATURE_COLUMNS) - set(X_temp.columns)
             if missing_cols:
-                logger.warning(f"Missing features for {symbol}: {missing_cols}, skipping")
+                logger.warning(
+                    f"Missing features for {symbol}: {missing_cols}, skipping"
+                )
                 continue
-            
+
             # Get features for the latest date, ensuring correct column order
             latest_features = X_temp[TRAINING_FEATURE_COLUMNS].iloc[-1:]
             X_latest = pd.concat([X_latest, latest_features])
             latest_symbols.append(symbol)
-            latest_prices.append(symbol_data.iloc[-1]['close'])
-            latest_dates.append(symbol_data.iloc[-1]['date'])
+            latest_prices.append(symbol_data.iloc[-1]["close"])
+            latest_dates.append(symbol_data.iloc[-1]["date"])
 
 if not X_latest.empty:
     try:
@@ -230,41 +243,51 @@ if not X_latest.empty:
     except Exception as e:
         logger.error(f"Error generating predictions: {e}")
         raise
-    
+
     # Create recommendations DataFrame
-    recommendations = pd.DataFrame({
-        'symbol': latest_symbols,
-        'last_price': latest_prices,
-        'last_date': latest_dates,
-        'signal': latest_signals,
-        'confidence': np.max(latest_proba, axis=1)
-    })
-    
+    recommendations = pd.DataFrame(
+        {
+            "symbol": latest_symbols,
+            "last_price": latest_prices,
+            "last_date": latest_dates,
+            "signal": latest_signals,
+            "confidence": np.max(latest_proba, axis=1),
+        }
+    )
+
     # Filter by confidence thresholds (risk-aware)
     # Buy signals need 70% confidence, Sell needs 50%
-    buy_mask = (recommendations['signal'] == 1) & (recommendations['confidence'] >= TradingConfig.MIN_BUY_CONFIDENCE)
-    sell_mask = (recommendations['signal'] == -1) & (recommendations['confidence'] >= TradingConfig.MIN_SELL_CONFIDENCE)
-    hold_mask = (recommendations['signal'] == 0)
-    
+    buy_mask = (recommendations["signal"] == 1) & (
+        recommendations["confidence"] >= TradingConfig.MIN_BUY_CONFIDENCE
+    )
+    sell_mask = (recommendations["signal"] == -1) & (
+        recommendations["confidence"] >= TradingConfig.MIN_SELL_CONFIDENCE
+    )
+    hold_mask = recommendations["signal"] == 0
+
     recommendations = recommendations[buy_mask | sell_mask | hold_mask].copy()
-    
+
     # Add signal text
     signal_map = {1: "BUY", -1: "SELL", 0: "HOLD"}
-    recommendations['recommendation'] = recommendations['signal'].map(signal_map)
+    recommendations["recommendation"] = recommendations["signal"].map(signal_map)
 
     # Coerce numeric columns and use nullable float dtypes
-    recommendations['last_price'] = pd.to_numeric(recommendations['last_price'], errors='coerce').astype('Float64')
-    recommendations['confidence'] = pd.to_numeric(recommendations['confidence'], errors='coerce').astype('Float64')
+    recommendations["last_price"] = pd.to_numeric(
+        recommendations["last_price"], errors="coerce"
+    ).astype("Float64")
+    recommendations["confidence"] = pd.to_numeric(
+        recommendations["confidence"], errors="coerce"
+    ).astype("Float64")
 
     # Fill or mark missing values: leave prices as NA (so frontend can show '-') and set missing confidence to 0.0
-    recommendations['confidence'] = recommendations['confidence'].fillna(0.0)
+    recommendations["confidence"] = recommendations["confidence"].fillna(0.0)
 
     # Round for readability
-    recommendations['last_price'] = recommendations['last_price'].round(2)
-    recommendations['confidence'] = recommendations['confidence'].round(3)
+    recommendations["last_price"] = recommendations["last_price"].round(2)
+    recommendations["confidence"] = recommendations["confidence"].round(3)
 
     # Sort by confidence for most confident predictions first
-    recommendations = recommendations.sort_values('confidence', ascending=False)
+    recommendations = recommendations.sort_values("confidence", ascending=False)
 
     # Safe printing helpers
     def fmt_price(v):
@@ -280,7 +303,7 @@ if not X_latest.empty:
         try:
             if pd.isna(v):
                 return "-"
-            return f"{float(v)*100:.1f}%"
+            return f"{float(v) * 100:.1f}%"
         except Exception:
             return "-"
 
@@ -288,25 +311,29 @@ if not X_latest.empty:
     print("=" * 80)
 
     # Print buy signals
-    buy_signals = recommendations[recommendations['signal'] == 1]
+    buy_signals = recommendations[recommendations["signal"] == 1]
     if not buy_signals.empty:
         print("\nBUY Recommendations:")
         print("-" * 40)
         for _, row in buy_signals.iterrows():
-            print(f"{row['symbol']:<12} Price: {fmt_price(row['last_price'])}  Confidence: {fmt_conf(row['confidence'])}")
+            print(
+                f"{row['symbol']:<12} Price: {fmt_price(row['last_price'])}  Confidence: {fmt_conf(row['confidence'])}"
+            )
 
     # Print sell signals
-    sell_signals = recommendations[recommendations['signal'] == -1]
+    sell_signals = recommendations[recommendations["signal"] == -1]
     if not sell_signals.empty:
         print("\nSELL Recommendations:")
         print("-" * 40)
         for _, row in sell_signals.iterrows():
-            print(f"{row['symbol']:<12} Price: {fmt_price(row['last_price'])}  Confidence: {fmt_conf(row['confidence'])}")
+            print(
+                f"{row['symbol']:<12} Price: {fmt_price(row['last_price'])}  Confidence: {fmt_conf(row['confidence'])}"
+            )
 
     # Save recommendations (write cleaned CSV)
     try:
         recommendations_path = RESULTS_DIR / "latest_recommendations.csv"
-        recommendations.to_csv(recommendations_path, index=False, float_format='%.3f')
+        recommendations.to_csv(recommendations_path, index=False, float_format="%.3f")
         logger.info(f"Recommendations saved to {recommendations_path}")
         print("\nDetailed recommendations saved to results/latest_recommendations.csv")
     except Exception as e:

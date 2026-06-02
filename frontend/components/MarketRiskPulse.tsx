@@ -13,7 +13,8 @@ export default function MarketRiskPulse() {
   useEffect(() => {
     const fetchRisk = async () => {
       try {
-        const res = await fetch('http://127.0.0.1:8000/api/market_risk');
+        const res = await fetch('/api/market-risk');
+        if (!res.ok) throw new Error('Failed to load market risk');
         const json = await res.json();
         setData(json);
       } catch (err) {

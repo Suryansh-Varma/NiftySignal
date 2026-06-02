@@ -5,23 +5,25 @@ import sys
 
 sys.path.append(str(Path.cwd()))
 
-print("\n" + "="*80)
+print("\n" + "=" * 80)
 print("DETAILED MODEL DIAGNOSTIC - DATA & TRAINING ANALYSIS")
-print("="*80)
+print("=" * 80)
 
 # Load training data
 try:
     df = pd.read_csv("data/processed/universe_data.csv")
-    df['date'] = pd.to_datetime(df['date'])
-    print(f"\n✅ Training data loaded: {len(df)} rows, {df['symbol'].nunique()} symbols")
+    df["date"] = pd.to_datetime(df["date"])
+    print(
+        f"\n✅ Training data loaded: {len(df)} rows, {df['symbol'].nunique()} symbols"
+    )
 except Exception as e:
     print(f"\n❌ Error loading training data: {e}")
     sys.exit(1)
 
 # Check data quality
-print("\n" + "="*80)
+print("\n" + "=" * 80)
 print("DATA QUALITY CHECK")
-print("="*80)
+print("=" * 80)
 
 print(f"\n📊 Data shape: {df.shape}")
 print(f"   Rows: {len(df):,}")
@@ -39,39 +41,35 @@ if missing.sum() == 0:
     print("   ✅ No missing values!")
 
 # Now prepare features and check label distribution
-print("\n" + "="*80)
+print("\n" + "=" * 80)
 print("FEATURE & LABEL ANALYSIS")
-print("="*80)
+print("=" * 80)
 
 try:
     from app.features.technical import prepare_features
-    
+
     print("\n🔄 Preparing features...")
-    X, y = prepare_features(
-        df,
-        forward_days=5,
-        return_threshold=0.02
-    )
-    
+    X, y, _ = prepare_features(df, forward_days=5, return_threshold=0.02)
+
     print(f"✅ Features prepared:")
     print(f"   X shape: {X.shape}")
     print(f"   y shape: {y.shape}")
     print(f"   Features: {list(X.columns)}")
-    
+
     # Check X for NaN/Inf values
     print(f"\n🔍 Feature quality check:")
     nan_count = X.isnull().sum().sum()
     inf_count = np.isinf(X.select_dtypes(include=[np.number])).sum().sum()
     print(f"   NaN values in features: {nan_count}")
     print(f"   Inf values in features: {inf_count}")
-    
+
     if nan_count > 0:
         print(f"\n   ⚠️  Columns with NaN:")
         for col in X.columns:
             nan_pct = (X[col].isnull().sum() / len(X)) * 100
             if nan_pct > 0:
                 print(f"      {col:20s}: {nan_pct:5.1f}% NaN")
-    
+
     # Check label distribution
     print(f"\n📊 Label distribution (y):")
     label_counts = pd.Series(y).value_counts().sort_index()
@@ -80,59 +78,62 @@ try:
         label_name = {-1: "SELL", 0: "HOLD", 1: "BUY"}.get(label, str(label))
         pct = (count / total) * 100
         print(f"   {label_name:6s} (={label:2d}): {count:5d} ({pct:5.1f}%)")
-    
+
     # Check imbalance
     if label_counts.max() > label_counts.min() * 2:
         print(f"\n   ⚠️  CLASS IMBALANCE DETECTED!")
         print(f"      Ratio: {label_counts.max() / label_counts.min():.1f}x")
         print(f"      This causes the model to predict the majority class")
-    
+
     # Check feature statistics
     print(f"\n📊 Feature statistics:")
     print(f"   Min value: {X.select_dtypes(include=[np.number]).min().min():.6f}")
     print(f"   Max value: {X.select_dtypes(include=[np.number]).max().max():.6f}")
     print(f"   Mean: {X.select_dtypes(include=[np.number]).mean().mean():.6f}")
     print(f"   Std: {X.select_dtypes(include=[np.number]).std().mean():.6f}")
-    
+
 except Exception as e:
     print(f"\n❌ Error during feature preparation: {e}")
     import traceback
+
     traceback.print_exc()
 
 # Check current model's latest predictions
-print("\n" + "="*80)
+print("\n" + "=" * 80)
 print("MODEL OUTPUT ANALYSIS")
-print("="*80)
+print("=" * 80)
 
 try:
     recommendations = pd.read_csv("results/latest_recommendations.csv")
-    
+
     print(f"\n✅ Loaded {len(recommendations)} recommendations")
-    
+
     # Check prediction diversity
-    if 'recommendation' in recommendations.columns:
-        rec_dist = recommendations['recommendation'].value_counts()
+    if "recommendation" in recommendations.columns:
+        rec_dist = recommendations["recommendation"].value_counts()
         print(f"\n📊 Prediction diversity:")
         for rec, count in rec_dist.items():
             pct = (count / len(recommendations)) * 100
             print(f"   {rec:10s}: {count:3d} ({pct:5.1f}%)")
-        
+
         # Flag if too imbalanced
         dominant = rec_dist.iloc[0]
         total = len(recommendations)
         if dominant > total * 0.95:
-            print(f"\n   🚨 WARNING: Model is predicting same class {dominant/total*100:.1f}% of time!")
+            print(
+                f"\n   🚨 WARNING: Model is predicting same class {dominant / total * 100:.1f}% of time!"
+            )
             print(f"      This indicates the model has not learned to discriminate")
-    
+
     # Check confidence distribution
-    if 'confidence' in recommendations.columns:
+    if "confidence" in recommendations.columns:
         print(f"\n📊 Confidence distribution:")
         print(f"   Mean: {recommendations['confidence'].mean():.3f}")
         print(f"   Median: {recommendations['confidence'].median():.3f}")
         print(f"   Std: {recommendations['confidence'].std():.3f}")
-        
+
         # Check if confidences are diverse
-        conf_std = recommendations['confidence'].std()
+        conf_std = recommendations["confidence"].std()
         if conf_std < 0.1:
             print(f"\n   ⚠️  WARNING: Confidences are too similar (std={conf_std:.3f})")
             print(f"      Model is not generating diverse predictions")
@@ -140,9 +141,9 @@ try:
 except Exception as e:
     print(f"\n❌ Error analyzing recommendations: {e}")
 
-print("\n" + "="*80)
+print("\n" + "=" * 80)
 print("ROOT CAUSE IDENTIFICATION")
-print("="*80)
+print("=" * 80)
 
 print("\n🔍 Probable Issues:")
 print("""
@@ -168,9 +169,9 @@ print("""
    - Fix: Add volatility-adjusted features, retrain often
 """)
 
-print("\n" + "="*80)
+print("\n" + "=" * 80)
 print("RECOMMENDED FIXES")
-print("="*80)
+print("=" * 80)
 
 print("\n✅ IMMEDIATE FIXES (Will improve accuracy):")
 print("""
@@ -209,4 +210,4 @@ print("""
    - Verify model generalizes to new periods
 """)
 
-print("\n" + "="*80)
+print("\n" + "=" * 80)

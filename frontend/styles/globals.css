@@ -104,6 +104,20 @@ a {
   color: inherit;
 }
 
+:focus-visible {
+  outline: 2px solid var(--primary-glow);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  box-shadow: 0 0 0 3px rgba(0, 255, 204, 0.25);
+  border-radius: 10px;
+}
+
 .skeuo-card {
   background: var(--skeuo-bg);
   border-radius: var(--radius-lg);
@@ -361,6 +375,17 @@ a {
 
 .slide-in-from-top-2 {
   animation: fadeInUp 0.25s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 ::-webkit-scrollbar {

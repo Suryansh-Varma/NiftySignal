@@ -2,12 +2,20 @@ from typing import List, Optional, Tuple
 import numpy as np
 import pandas as pd
 import talib as ta
+from sklearn.preprocessing import LabelEncoder
 
 # Import risk factor calculator
 try:
     from app.features.risk_factors import RiskFactorCalculator
 except ImportError:
     RiskFactorCalculator = None
+
+# Import market context features (Nifty 50 index-relative)
+try:
+    from app.features.market_context import add_market_context_features, MARKET_CONTEXT_FEATURES
+except ImportError:
+    add_market_context_features = None
+    MARKET_CONTEXT_FEATURES = []
 
 def add_technical_features(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -40,15 +48,23 @@ def add_technical_features(df: pd.DataFrame) -> pd.DataFrame:
         
         # Momentum indicators
         temp['rsi_14'] = ta.RSI(temp['close'], timeperiod=14)
-        temp['macd'], temp['macd_signal'], temp['macd_hist'] = ta.MACD(
+        macd, macd_signal, macd_hist = ta.MACD(
             temp['close'], fastperiod=12, slowperiod=26, signalperiod=9
         )
+        # Normalize MACD by price to make it scale-invariant
+        temp['macd'] = macd / temp['close']
+        temp['macd_signal'] = macd_signal / temp['close']
+        temp['macd_hist'] = macd_hist / temp['close']
         
         # Volatility indicators
         temp['bb_upper'], temp['bb_middle'], temp['bb_lower'] = ta.BBANDS(
             temp['close'], timeperiod=20, nbdevup=2, nbdevdn=2
         )
-        temp['atr'] = ta.ATR(temp['high'], temp['low'], temp['close'], timeperiod=14)
+        # Normalize BB distance from middle
+        temp['bb_dist'] = (temp['close'] - temp['bb_middle']) / temp['bb_middle']
+        
+        # Normalize ATR by price
+        temp['atr'] = ta.ATR(temp['high'], temp['low'], temp['close'], timeperiod=14) / temp['close']
         
         # Volume indicators
         temp['obv'] = ta.OBV(temp['close'], temp['volume'])
@@ -62,14 +78,28 @@ def add_technical_features(df: pd.DataFrame) -> pd.DataFrame:
         # Trend indicators
         temp['adx'] = ta.ADX(temp['high'], temp['low'], temp['close'], timeperiod=14)
         
+        # Additional Momentum Indicators
+        temp['stoch_k'], temp['stoch_d'] = ta.STOCH(
+            temp['high'], temp['low'], temp['close'], 
+            fastk_period=5, slowk_period=3, slowk_matype=0, slowd_period=3, slowd_matype=0
+        )
+        temp['willr'] = ta.WILLR(temp['high'], temp['low'], temp['close'], timeperiod=14)
+        temp['roc'] = ta.ROC(temp['close'], timeperiod=10)
+        temp['cci'] = ta.CCI(temp['high'], temp['low'], temp['close'], timeperiod=14)
+        
         # Custom features
         # Returns
         temp['returns_1d'] = temp['close'].pct_change()
         temp['returns_5d'] = temp['close'].pct_change(5)
         temp['returns_20d'] = temp['close'].pct_change(20)
         
+        # Lags of returns (Autocorrection features)
+        temp['returns_1d_lag1'] = temp['returns_1d'].shift(1)
+        temp['returns_1d_lag2'] = temp['returns_1d'].shift(2)
+        
         # Volatility
         temp['volatility_20d'] = temp['returns_1d'].rolling(20).std()
+        temp['volatility_lag5'] = temp['volatility_20d'].shift(5)
         
         # Price relative to moving averages
         temp['price_to_sma_10'] = temp['close'] / temp['sma_10'] - 1
@@ -123,23 +153,30 @@ def prepare_features(
     forward_days: int = 5,
     return_threshold: float = 0.015,  # Reduced to 1.5% to capture more opportunities
     include_risk_factors: bool = True
-) -> Tuple[pd.DataFrame, pd.Series]:
+) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
     """
     Prepare feature matrix X and target vector y for ML model.
-    
-    Args:
-        df: DataFrame with price data
-        feature_columns: List of feature columns to use (None = use default)
-        forward_days: Days to look ahead for forward returns
-        return_threshold: Return threshold for signal generation
-        include_risk_factors: Whether to include risk factor features
-        
-    Returns:
-        Tuple of (X, y) where X is feature matrix and y is target labels
+    Also returns the labelled DataFrame (with 'symbol' column) for sector routing.
+    Returns: (X, y, df_ml)
     """
     # Add technical indicators
     df_features = add_technical_features(df)
     
+    # Add symbol encoding to learn ticker-specific patterns
+    le = LabelEncoder()
+    df_features['symbol_encoded'] = le.fit_transform(df_features['symbol'])
+    
+    # Add volatility-normalized returns
+    df_features['returns_vol_adj'] = df_features['returns_1d'] / df_features['volatility_20d'].replace(0, np.nan)
+    
+    # Add Nifty 50 market context features (index-relative alpha, regime, beta)
+    if add_market_context_features is not None:
+        try:
+            df_features = add_market_context_features(df_features)
+        except Exception as _e:
+            import logging as _log
+            _log.getLogger(__name__).warning(f"Market context features skipped: {_e}")
+
     # Add risk factors if available
     if include_risk_factors and RiskFactorCalculator is not None:
         risk_calc = RiskFactorCalculator(lookback_period=30)
@@ -156,16 +193,23 @@ def prepare_features(
         # Use full feature set if enough data, otherwise use reduced set
         if min_rows_per_symbol >= 50:
             feature_columns = [
-                'rsi_14', 'macd', 'macd_signal', 'macd_hist',
-                'bb_upper', 'bb_middle', 'bb_lower', 'atr',
-                'adx', 'returns_1d', 'returns_5d', 'returns_20d',
-                'volatility_20d', 'price_to_sma_10', 'price_to_sma_20', 'price_to_sma_50'
+                'symbol_encoded',
+                'rsi_14', 'macd', 'macd_signal', 'macd_hist', 'stoch_k', 'stoch_d', 'willr', 'roc', 'cci',
+                'bb_dist', 'atr', 'adx', 'returns_vol_adj',
+                'returns_1d', 'returns_5d', 'returns_20d',
+                'returns_1d_lag1', 'returns_1d_lag2',
+                'volatility_20d', 'volatility_lag5',
+                'price_to_sma_10', 'price_to_sma_20', 'price_to_sma_50',
             ]
+            # Append Nifty 50 market context features if present in the dataframe
+            for _col in MARKET_CONTEXT_FEATURES:
+                if _col in df_labeled.columns and _col not in feature_columns:
+                    feature_columns.append(_col)
         elif min_rows_per_symbol >= 20:
-            # Reduced feature set for smaller datasets (no SMA_50, no returns_20d, no volatility_20d)
+            # Reduced feature set for smaller datasets
             feature_columns = [
                 'rsi_14', 'macd', 'macd_signal', 'macd_hist',
-                'bb_upper', 'bb_middle', 'bb_lower', 'atr',
+                'bb_dist', 'atr',
                 'adx', 'returns_1d', 'returns_5d',
                 'price_to_sma_10', 'price_to_sma_20'
             ]
@@ -184,8 +228,11 @@ def prepare_features(
             if 'risk_factor_macro' in df_labeled.columns:
                 feature_columns.append('risk_factor_macro')
     
-    # Prepare X and y, dropping any rows with NaN
-    df_ml = df_labeled.dropna(subset=feature_columns + ['signal'])
+    # Use only columns that are actually present
+    available_features = [c for c in feature_columns if c in df_labeled.columns]
+
+    # Prepare X and y, dropping any rows with NaN in selected features
+    df_ml = df_labeled.dropna(subset=available_features + ['signal'])
     
     if len(df_ml) == 0:
         raise ValueError(
@@ -194,7 +241,8 @@ def prepare_features(
             f"Current: {min_rows_per_symbol} rows per symbol."
         )
     
-    X = df_ml[feature_columns]
+    X = df_ml[available_features]
     y = df_ml['signal']
     
-    return X, y
+    # Return X, y, and the labelled DataFrame (contains 'symbol' for sector routing)
+    return X, y, df_ml

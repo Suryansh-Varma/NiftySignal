@@ -169,7 +169,7 @@ export default function Signup() {
           <div className="skeuo-card" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', padding: '3rem', marginBottom: '3rem' }}>
             <div style={{ color: 'var(--accent-400)', fontSize: '1.5rem', marginBottom: '1.5rem', letterSpacing: '4px' }}>★★★★★</div>
             <p style={{ fontSize: '1.25rem', color: 'white', lineHeight: 1.7, marginBottom: '2.5rem', fontWeight: 600, fontStyle: 'italic' }}>
-              "NiftySignal helped me move beyond traditional indicators. The neural predictions deliver a measurable edge in the Indian markets."
+              "NIFTYSIGNAL AI helped me move beyond traditional indicators. The neural predictions deliver a measurable edge in the Indian markets."
             </p>
             <div className="flex items-center gap-4">
               <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary-400), var(--primary-600))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 900, fontSize: '1.2rem', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}>

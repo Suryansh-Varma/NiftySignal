@@ -17,14 +17,14 @@ To run as Windows service:
 """
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
-from datetime import datetime
+from datetime import datetime, timedelta
 import subprocess
 import sys
 from pathlib import Path
 import logging
 import os
+import pandas as pd
 
 from app.scripts.auto_update_macro_risk import compute_and_update as auto_update_macro_risk
 from app.scripts.generate_recommendations import generate as generate_recommendations
@@ -43,11 +43,84 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Silence noisy third-party debug logs during long-running data jobs
+logging.getLogger("yfinance").setLevel(logging.WARNING)
+logging.getLogger("peewee").setLevel(logging.WARNING)
+logging.getLogger("nselib").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+
 # Paths
 BASE_DIR = Path(__file__).parent.parent
 DATA_FETCH_SCRIPT = BASE_DIR / "app" / "api" / "main.py"
 RETRAIN_SCRIPT = BASE_DIR / "retrain_model_recent.py"
 ASSEMBLE_SCRIPT = BASE_DIR / "app" / "scripts" / "assemble_universe.py"
+
+
+def quick_refresh_recommendation_prices() -> bool:
+    """
+    Fast fallback: refresh last_price/last_date in latest_recommendations.csv
+    using recent yfinance candles for symbols already in recommendations.
+    """
+    try:
+        import yfinance as yf
+
+        rec_path = BASE_DIR / "results" / "latest_recommendations.csv"
+        if not rec_path.exists():
+            logger.warning("Quick refresh skipped: latest_recommendations.csv not found")
+            return False
+
+        recs = pd.read_csv(rec_path)
+        if recs.empty or 'symbol' not in recs.columns:
+            logger.warning("Quick refresh skipped: recommendations file has no symbols")
+            return False
+
+        symbols = sorted(recs['symbol'].dropna().astype(str).unique().tolist())
+        logger.info(f"Quick refresh: fetching recent prices for {len(symbols)} symbols...")
+
+        data = yf.download(symbols, period="7d", interval="1d", progress=False, threads=True)
+        if data is None or data.empty:
+            logger.warning("Quick refresh failed: yfinance returned empty data")
+            return False
+
+        updated = 0
+        for idx, row in recs.iterrows():
+            symbol = str(row.get('symbol', '')).strip()
+            if not symbol:
+                continue
+
+            try:
+                if isinstance(data.columns, pd.MultiIndex):
+                    sym_data = data.xs(symbol, axis=1, level=1)
+                else:
+                    sym_data = data
+
+                if sym_data.empty:
+                    continue
+
+                close_series = sym_data.get('Close', pd.Series(dtype=float)).dropna()
+                if close_series.empty:
+                    continue
+
+                last_dt = close_series.index[-1]
+                last_close = float(close_series.iloc[-1])
+
+                recs.at[idx, 'last_price'] = last_close
+                recs.at[idx, 'last_date'] = pd.to_datetime(last_dt).strftime('%Y-%m-%d')
+                updated += 1
+            except Exception:
+                continue
+
+        if updated == 0:
+            logger.warning("Quick refresh did not update any rows")
+            return False
+
+        recs.to_csv(rec_path, index=False)
+        logger.info(f"Quick refresh completed: updated {updated} recommendation rows")
+        return True
+
+    except Exception as e:
+        logger.warning(f"Quick recommendation refresh failed: {e}")
+        return False
 
 
 def fetch_daily_data():
@@ -62,32 +135,30 @@ def fetch_daily_data():
     try:
         # Step 1: Fetch latest data from yfinance/nselib
         logger.info("Step 1: Fetching latest market data...")
+        logger.info("This job can take several minutes depending on provider/network.")
         result = subprocess.run(
             [sys.executable, str(DATA_FETCH_SCRIPT)],
-            capture_output=True,
-            text=True,
-            timeout=600  # 10 minutes max
+            cwd=str(BASE_DIR),
+            timeout=3600  # 60 minutes max (all-NSE refresh can take longer)
         )
         
         if result.returncode != 0:
             logger.error(f"Data fetch failed with exit code {result.returncode}")
-            logger.error(f"Error output: {result.stderr}")
-            return False
+            logger.info("Falling back to quick recommendation price refresh...")
+            return quick_refresh_recommendation_prices()
         
         logger.info("Data fetch completed successfully")
-        logger.info(f"Output: {result.stdout[-500:]}")  # Last 500 chars
         
         # Step 2: Assemble universe data
         logger.info("Step 2: Assembling universe data...")
         result = subprocess.run(
             [sys.executable, str(ASSEMBLE_SCRIPT)],
-            capture_output=True,
-            text=True,
+            cwd=str(BASE_DIR),
             timeout=300  # 5 minutes max
         )
         
         if result.returncode != 0:
-            logger.warning(f"Assembly step failed: {result.stderr}")
+            logger.warning("Assembly step failed")
             # Not critical, continue
         else:
             logger.info("Universe data assembled successfully")
@@ -98,11 +169,17 @@ def fetch_daily_data():
         return True
         
     except subprocess.TimeoutExpired:
-        logger.error("Data fetch timed out (>10 minutes)")
-        return False
+        logger.error("Data fetch timed out (>60 minutes)")
+        logger.info("Falling back to quick recommendation price refresh...")
+        return quick_refresh_recommendation_prices()
+    except KeyboardInterrupt:
+        logger.warning("Daily data fetch interrupted by user")
+        logger.info("Falling back to quick recommendation price refresh...")
+        return quick_refresh_recommendation_prices()
     except Exception as e:
         logger.error(f"Unexpected error during daily data fetch: {e}", exc_info=True)
-        return False
+        logger.info("Falling back to quick recommendation price refresh...")
+        return quick_refresh_recommendation_prices()
 
 
 def retrain_model_weekly():
@@ -119,25 +196,15 @@ def retrain_model_weekly():
         
         result = subprocess.run(
             [sys.executable, str(RETRAIN_SCRIPT)],
-            capture_output=True,
-            text=True,
+            cwd=str(BASE_DIR),
             timeout=1800  # 30 minutes max
         )
         
         if result.returncode != 0:
             logger.error(f"Model retraining failed with exit code {result.returncode}")
-            logger.error(f"Error output: {result.stderr}")
             return False
         
         logger.info("Model retraining completed successfully")
-        
-        # Log key metrics from output
-        output = result.stdout
-        if "Test accuracy:" in output or "NEW MODEL ACCURACY:" in output:
-            # Extract accuracy info
-            for line in output.split('\n'):
-                if 'accuracy' in line.lower() or 'BUY:' in line or 'SELL:' in line:
-                    logger.info(f"  {line.strip()}")
         
         logger.info("="*70)
         logger.info("WEEKLY MODEL RETRAINING COMPLETED SUCCESSFULLY")
@@ -146,6 +213,9 @@ def retrain_model_weekly():
         
     except subprocess.TimeoutExpired:
         logger.error("Model retraining timed out (>30 minutes)")
+        return False
+    except KeyboardInterrupt:
+        logger.warning("Weekly model retraining interrupted by user")
         return False
     except Exception as e:
         logger.error(f"Unexpected error during model retraining: {e}", exc_info=True)
@@ -202,7 +272,45 @@ def generate_daily_recommendations():
         return False
 
 
+def get_latest_universe_date():
+    """
+    Return latest date found in data/processed/universe_data.csv (or None).
+    """
+    try:
+        universe_path = BASE_DIR / "data" / "processed" / "universe_data.csv"
+        if not universe_path.exists():
+            return None
 
+        df = pd.read_csv(universe_path, usecols=['date'])
+        if df.empty:
+            return None
+
+        latest = pd.to_datetime(df['date'], errors='coerce').max()
+        if pd.isna(latest):
+            return None
+
+        return latest.to_pydatetime().date()
+    except Exception as e:
+        logger.warning(f"Unable to inspect universe_data.csv freshness: {e}")
+        return None
+
+
+def should_refresh_data_on_startup(max_stale_days: int = 1):
+    """
+    Decide whether to trigger immediate refresh at scheduler startup.
+    """
+    latest_date = get_latest_universe_date()
+    if latest_date is None:
+        logger.info("No valid universe_data.csv found; startup refresh required")
+        return True
+
+    today = datetime.now().date()
+    stale_days = (today - latest_date).days
+    logger.info(f"Current universe_data latest date: {latest_date} (stale: {stale_days} days)")
+    return stale_days > max_stale_days
+
+
+def test_run_all():
     """
     Test run all jobs manually (for debugging).
     """
@@ -226,7 +334,6 @@ def generate_daily_recommendations():
     logger.info("MANUAL TEST COMPLETED")
     logger.info("="*70 + "\n")
 
-
 def start_scheduler():
     """
     Start the background scheduler with all jobs configured.
@@ -241,6 +348,19 @@ def start_scheduler():
         update_macro_risk()
     except Exception as e:
         logger.warning(f"Startup macro risk update failed (non-critical): {e}")
+
+    # If data is stale, immediately refresh data + recommendations at startup
+    try:
+        if should_refresh_data_on_startup(max_stale_days=1):
+            logger.info("Startup detected stale market data. Running immediate refresh...")
+            if fetch_daily_data():
+                generate_daily_recommendations()
+            else:
+                logger.warning("Startup immediate data refresh failed; will rely on scheduled jobs")
+        else:
+            logger.info("Startup data freshness check passed; skipping immediate full refresh")
+    except Exception as e:
+        logger.warning(f"Startup freshness check failed (non-critical): {e}")
 
     # Create scheduler
     scheduler = BackgroundScheduler(timezone='Asia/Kolkata')

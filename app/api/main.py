@@ -18,20 +18,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Silence verbose third-party debug noise during bulk fetch runs
+logging.getLogger("yfinance").setLevel(logging.WARNING)
+logging.getLogger("peewee").setLevel(logging.WARNING)
+logging.getLogger("nselib").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+
 # Get all NSE stocks (~2,671 listed companies)
 logger.info("Loading NSE universe (all 2671+ listed stocks)...")
 UNIVERSE = get_all_nse_stocks()
 logger.info(f"Universe size: {len(UNIVERSE)} stocks")
 
-# Get current date minus 1 day to ensure we get the latest completed trading day
-current_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+# Get current date to fetch latest available data (includes today if market is open)
+current_date = datetime.now().strftime("%Y-%m-%d")
 
 try:
     # Ensure data directory exists
     DATA_RAW_DIR.mkdir(parents=True, exist_ok=True)
     
-    # Get current date minus 1 day to ensure we get the latest completed trading day
-    current_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    # Get current date to fetch latest available data (includes today if market is open)
+    current_date = datetime.now().strftime("%Y-%m-%d")
     
     # First try to fetch historical data
     # Default to NSELIB for official NSE data, fall back to yfinance
@@ -46,12 +52,18 @@ try:
             if df.empty:
                 logger.warning("nselib returned empty; falling back to yfinance")
                 df = fetch_history_yf(UNIVERSE, start="2023-01-01", end=current_date, force_refresh=True)
+        except KeyboardInterrupt:
+            logger.warning("nselib fetch interrupted; falling back to yfinance")
+            df = fetch_history_yf(UNIVERSE, start="2023-01-01", end=current_date, force_refresh=True)
         except Exception as e:
             logger.warning(f"nselib unavailable or failed: {e}; falling back to yfinance")
             df = fetch_history_yf(UNIVERSE, start="2023-01-01", end=current_date, force_refresh=True)
     elif provider == "NSEPY":
         try:
             df = fetch_history_nsepy(UNIVERSE, start="2023-01-01", end=current_date)
+        except KeyboardInterrupt:
+            logger.warning("NSEpy fetch interrupted; falling back to yfinance")
+            df = fetch_history_yf(UNIVERSE, start="2023-01-01", end=current_date, force_refresh=True)
         except Exception as e:
             logger.warning(f"NSEpy unavailable or failed: {e}; falling back to yfinance")
             df = fetch_history_yf(UNIVERSE, start="2023-01-01", end=current_date, force_refresh=True)

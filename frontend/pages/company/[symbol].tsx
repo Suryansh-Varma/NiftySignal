@@ -26,7 +26,16 @@ export default function CompanyDetail() {
   const [recommendation, setRecommendation] = useState<CompanyRecommendation | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+  const normalizeSymbol = (value: string) => {
+    const upper = value.toUpperCase()
+    return upper.endsWith('.NS') ? upper : `${upper}.NS`
+  }
+
+  const normalizeConfidence = (value: number | undefined) => {
+    if (!value && value !== 0) return 0
+    return value > 1 ? value / 100 : value
+  }
 
   useEffect(() => {
     if (!symbol || authLoading) return
@@ -36,18 +45,28 @@ export default function CompanyDetail() {
         setLoading(true)
         setError('')
 
-        if (!isValidNiftySymbol(symbol)) {
+        const normalizedSymbol = normalizeSymbol(symbol)
+
+        if (!isValidNiftySymbol(normalizedSymbol)) {
           setError('Invalid stock symbol. Use an NSE symbol like RELIANCE.NS.')
           return
         }
 
-        const recRes = await axios.get(`${apiUrl}/api/recommendations?symbol=${symbol}`)
+        const recRes = await axios.get(`/api/recommendations?symbol=${normalizedSymbol}`)
         const rec = (recRes.data?.[0] || null) as CompanyRecommendation | null
-        setRecommendation(rec)
+        setRecommendation(
+          rec
+            ? {
+                ...rec,
+                symbol: normalizeSymbol(rec.symbol || normalizedSymbol),
+                confidence: normalizeConfidence(rec.confidence),
+              }
+            : null
+        )
 
         setCompany({
-          symbol: symbol.toUpperCase(),
-          name: getCompanyName(symbol),
+          symbol: normalizedSymbol,
+          name: getCompanyName(normalizedSymbol),
         })
       } catch (err) {
         console.error('Failed to load company data:', err)

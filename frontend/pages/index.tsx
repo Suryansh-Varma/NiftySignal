@@ -4,18 +4,19 @@ import Link from 'next/link'
 import { useAuth } from '../lib/auth'
 import MarketRiskPulse from '../components/MarketRiskPulse'
 import LivePredictCard from '../components/LivePredictCard'
+import { getClientApiBase, buildApiUrl } from '../lib/api-base'
 
 export default function Home() {
   const [recs, setRecs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const { isAuthenticated } = useAuth()
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+  const apiUrl = getClientApiBase()
 
   useEffect(() => {
     if (isAuthenticated) {
       setLoading(true)
       axios
-        .get(`${apiUrl}/api/recommendations`)
+          .get(buildApiUrl(apiUrl, '/api/recommendations'))
         .then(r => setRecs(r.data.slice(0, 10)))
         .catch(err => console.error('Failed to load:', err))
         .finally(() => setLoading(false))
@@ -38,9 +39,9 @@ export default function Home() {
           
           <div className="flex flex-col md:flex-row justify-between items-start gap-6">
             <div className="space-y-2">
-              <h1 className="text-5xl font-black tracking-tighter text-white uppercase italic">
-                NiftySignal <span className="text-[var(--primary-glow)]">AI</span>
-              </h1>
+                     <h1 className="text-5xl font-black tracking-tighter text-white uppercase italic">
+                        NIFTYSIGNAL <span className="text-[var(--primary-glow)]">AI</span>
+                     </h1>
               <p className="text-[var(--text-secondary)] font-mono text-xs tracking-widest uppercase">
                         Smart market signals for NSE stocks
               </p>
@@ -87,21 +88,21 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="p-8 rounded-3xl border border-[var(--border-glass)] bg-[var(--bg-card)]">
+          <div className="p-6 md:p-8 rounded-3xl border border-[var(--border-glass)] bg-[var(--bg-card)] overflow-hidden">
              <div className="flex justify-between items-center mb-8">
                 <h3 className="text-xl font-black text-white uppercase tracking-tighter italic">Top Recommendations</h3>
                 <span className="bg-[var(--bg-deep)] py-2 px-4 rounded-full border border-[var(--border-glass)] text-[10px] font-mono text-[var(--text-muted)]">LIVE DATA</span>
              </div>
 
              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full min-w-[840px] table-fixed border-collapse">
                    <thead>
                       <tr className="border-b border-[var(--border-glass)]">
-                         <th className="pb-4 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Symbol</th>
-                         <th className="pb-4 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Price (INR)</th>
-                         <th className="pb-4 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Signal</th>
-                         <th className="pb-4 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Confidence</th>
-                         <th className="pb-4 text-right text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Link</th>
+                         <th className="w-[22%] pb-4 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Symbol</th>
+                         <th className="w-[20%] pb-4 pr-4 text-right text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Price (INR)</th>
+                         <th className="w-[12%] pb-4 text-center text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Signal</th>
+                         <th className="w-[26%] pb-4 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Confidence</th>
+                         <th className="w-[20%] pb-4 text-right text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Link</th>
                       </tr>
                    </thead>
                    <tbody>
@@ -110,9 +111,9 @@ export default function Home() {
                       ) : (
                         recs.map((r, i) => (
                            <tr key={r.symbol} className="border-b border-[var(--border-glass)] hover:bg-white/5 transition-colors group">
-                              <td className="py-4 font-mono font-bold text-white text-sm">{r.symbol.replace('.NS', '')}</td>
-                              <td className="py-4 font-mono text-sm text-[var(--text-secondary)]">{Number(r.last_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                              <td className="py-4">
+                              <td className="py-4 font-mono font-bold text-white text-sm whitespace-nowrap">{r.symbol.replace('.NS', '')}</td>
+                              <td className="py-4 pr-4 text-right font-mono tabular-nums text-sm text-[var(--text-secondary)] whitespace-nowrap">{Number(r.last_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                              <td className="py-4 text-center">
                                  <span className={`text-[10px] font-black px-2 py-0.5 rounded border ${
                                     r.recommendation === 'BUY' ? 'text-[var(--status-buy)] border-[var(--status-buy)]/30' : 
                                     r.recommendation === 'SELL' ? 'text-[var(--status-sell)] border-[var(--status-sell)]/30' : 
@@ -122,11 +123,16 @@ export default function Home() {
                                  </span>
                               </td>
                               <td className="py-4">
-                                 <div className="w-24 h-1 bg-[var(--bg-deep)] rounded-full overflow-hidden">
-                                    <div className="h-full bg-[var(--primary-glow)] opacity-80" style={{ width: `${r.confidence * 100}%` }}></div>
+                                 <div className="flex items-center justify-between gap-3 max-w-[220px]">
+                                    <div className="w-24 h-1 bg-[var(--bg-deep)] rounded-full overflow-hidden">
+                                       <div className="h-full bg-[var(--primary-glow)] opacity-80" style={{ width: `${r.confidence * 100}%` }}></div>
+                                    </div>
+                                    <span className="text-[10px] font-mono tabular-nums text-[var(--text-secondary)] min-w-[52px] text-right">
+                                       {(r.confidence * 100).toFixed(1)}%
+                                    </span>
                                  </div>
                               </td>
-                              <td className="py-4 text-right">
+                              <td className="py-4 text-right whitespace-nowrap">
                                  <Link href={`/company/${r.symbol}`} className="text-[10px] font-bold text-[var(--text-muted)] group-hover:text-[var(--primary-glow)] transition-colors">VIEW DETAILS</Link>
                               </td>
                            </tr>

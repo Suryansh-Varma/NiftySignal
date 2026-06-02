@@ -2,12 +2,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
-import { io } from 'socket.io-client'
 import TrendChart from '../components/TrendChart'
 import IntradayChart from '../components/IntradayChart'
 import RiskPanel from '../components/RiskPanel'
+import PageLoader from '../components/PageLoader'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
+import { getClientApiBase, buildApiUrl } from '../lib/api-base'
 
 type Position = { symbol: string; name: string; qty: number; price: number; changePct: number }
 type Recommendation = {
@@ -27,15 +28,16 @@ export default function Dashboard() {
   const [positions, setPositions] = useState<Position[]>([])
   const [buyOpportunities, setBuyOpportunities] = useState<Recommendation[]>([])
   const [portfolioRecommendations, setPortfolioRecommendations] = useState<Recommendation[]>([])
+  const [allRecommendations, setAllRecommendations] = useState<Recommendation[]>([])
   const [totalAnalyzed, setTotalAnalyzed] = useState(0)
   const [trendLabels, setTrendLabels] = useState<string[]>([])
   const [trendData, setTrendData] = useState<number[]>([])
   const [intradayLabels, setIntradayLabels] = useState<string[]>([])
   const [intradayData, setIntradayData] = useState<number[]>([])
   const [risk, setRisk] = useState({ score: 0.12, factors: [] as any[] })
-  const [wsConnected, setWsConnected] = useState(false)
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null)
   const [loading, setLoading] = useState(true)
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+  const apiUrl = getClientApiBase()
 
   useEffect(() => {
     if (authLoading) return
@@ -43,12 +45,22 @@ export default function Dashboard() {
       router.push('/login')
       return
     }
-    loadInitial()
+    loadInitial(true)
   }, [authLoading, isAuthenticated])
 
-  async function loadInitial() {
+  useEffect(() => {
+    if (authLoading || !isAuthenticated) return
+
+    const intervalId = setInterval(() => {
+      loadInitial(false)
+    }, 15000)
+
+    return () => clearInterval(intervalId)
+  }, [authLoading, isAuthenticated, user])
+
+  async function loadInitial(showLoader = false) {
     try {
-      setLoading(true)
+      if (showLoader) setLoading(true)
 
       const userPortfolioSymbols = new Set<string>()
       if (user) {
@@ -58,8 +70,9 @@ export default function Dashboard() {
         }
       }
 
-      const recRes = await fetch(`${apiUrl}/api/recommendations`)
+      const recRes = await fetch('/api/recommendations')
       const allRecs: Recommendation[] = await recRes.json()
+      setAllRecommendations(allRecs)
       setTotalAnalyzed(allRecs.length)
 
       const inPortfolio: Recommendation[] = []
@@ -86,8 +99,11 @@ export default function Dashboard() {
       const marketPayload = await fetch('/api/market')
         .then((r) => r.json())
         .catch(() => ({ trend: { labels: [], values: [] }, riskScore: 0.12, factors: [] }))
-      setTrendLabels(marketPayload.trend.labels || [])
-      setTrendData(marketPayload.trend.values || [])
+      const labels = marketPayload.trend?.labels || []
+      const values = marketPayload.trend?.values || []
+      const hasValidTrend = Array.isArray(labels) && Array.isArray(values) && labels.length > 1 && values.length > 1
+      setTrendLabels(hasValidTrend ? labels : [])
+      setTrendData(hasValidTrend ? values : [])
       setRisk({ score: marketPayload.riskScore ?? 0.12, factors: marketPayload.factors ?? [] })
 
       if (portfolioPayload.positions?.length) {
@@ -98,83 +114,32 @@ export default function Dashboard() {
           setIntradayData(intradaySeries.map((d: any) => d.v))
         }
       }
+
+      setLastRefreshedAt(new Date())
     } catch (err) {
       console.error('Failed to load dashboard data', err)
     } finally {
-      setLoading(false)
+      if (showLoader) setLoading(false)
     }
   }
 
-  useEffect(() => {
-    const wsUrl =
-      process.env.NEXT_PUBLIC_WS_URL ||
-      (typeof window !== 'undefined' ? `http://${window.location.hostname}:4000` : 'http://localhost:4000')
+  const effectiveRecommendations = portfolioRecommendations.length > 0 ? portfolioRecommendations : allRecommendations
 
-    const socket = io(wsUrl, {
-      auth: { token: 'demo-token' },
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: Infinity,
-    })
-
-    socket.on('connect', () => {
-      setWsConnected(true)
-      socket.emit('subscribe_portfolio')
-      socket.emit('subscribe_risk')
-      positions.forEach((position) => socket.emit('subscribe', position.symbol))
-    })
-
-    socket.on('portfolio_update', (data: any) => {
-      if (data.positions) {
-        setPositions(
-          data.positions.map((p: any) => ({
-            symbol: p.symbol,
-            name: p.name || p.symbol,
-            qty: p.qty,
-            price: p.price,
-            changePct: p.changePct,
-          }))
-        )
-      }
-    })
-
-    socket.on('risk_update', (data: any) => {
-      setRisk({ score: data.riskScore ?? 0.12, factors: data.factors ?? [] })
-    })
-
-    socket.on('intraday', (data: any) => {
-      if (data.symbol === positions[0]?.symbol && data.point) {
-        setIntradayLabels((prev) => [...prev.slice(-13), data.point.t])
-        setIntradayData((prev) => [...prev.slice(-13), data.point.v])
-      }
-    })
-
-    socket.on('disconnect', () => {
-      setWsConnected(false)
-    })
-
-    return () => {
-      socket.disconnect()
-    }
-  }, [positions])
-
-  const buyCount = buyOpportunities.length
-  const sellCount = portfolioRecommendations.filter((r) => r.recommendation === 'SELL').length
-  const holdCount = portfolioRecommendations.filter((r) => r.recommendation === 'HOLD').length
+  const buyCount = effectiveRecommendations.filter((r) => r.recommendation === 'BUY').length
+  const sellCount = effectiveRecommendations.filter((r) => r.recommendation === 'SELL').length
+  const holdCount = effectiveRecommendations.filter((r) => r.recommendation === 'HOLD').length
   const avgConfidence = useMemo(() => {
-    if (!portfolioRecommendations.length) return 0
-    const total = portfolioRecommendations.reduce((sum, row) => sum + row.confidence, 0)
-    return (total / portfolioRecommendations.length) * 100
-  }, [portfolioRecommendations])
+    if (!effectiveRecommendations.length) return 0
+    const total = effectiveRecommendations.reduce((sum, row) => sum + row.confidence, 0)
+    return (total / effectiveRecommendations.length) * 100
+  }, [effectiveRecommendations])
 
-  if (authLoading || loading) {
-    return (
-      <div className="flex flex-col items-center justify-center" style={{ minHeight: '60vh', gap: '1.5rem' }}>
-        <div className="animate-spin" style={{ width: '3rem', height: '3rem', border: '4px solid var(--slate-200)', borderTopColor: 'var(--primary-500)', borderRadius: '50%' }} />
-        <p style={{ color: 'var(--slate-500)', fontWeight: 600 }}>Loading dashboard...</p>
-      </div>
-    )
+  if (authLoading) {
+    return <PageLoader isLoading={true} message="Authenticating..." />
+  }
+
+  if (loading) {
+    return <PageLoader isLoading={true} message="Loading dashboard..." />
   }
 
   return (
@@ -197,8 +162,10 @@ export default function Dashboard() {
               </p>
             </div>
             <div className="flex items-center gap-2" style={{ padding: '0.45rem 0.75rem', border: '1px solid var(--border-glass)', borderRadius: '999px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: wsConnected ? 'var(--status-buy)' : 'var(--status-sell)' }} />
-              <span style={{ color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.8rem' }}>{wsConnected ? 'Live updates on' : 'Live updates off'}</span>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--status-buy)' }} />
+              <span style={{ color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.8rem' }}>
+                Auto-refresh every 15s{lastRefreshedAt ? ` • ${lastRefreshedAt.toLocaleTimeString()}` : ''}
+              </span>
             </div>
           </div>
         </div>
@@ -247,26 +214,26 @@ export default function Dashboard() {
               <EmptyState text="No holdings found. Add stocks to get portfolio-specific signals." />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[700px] table-fixed">
                   <thead>
                     <tr style={tableHeadRowStyle}>
-                      <th style={thLeftStyle}>Symbol</th>
-                      <th style={thLeftStyle}>Signal</th>
-                      <th style={thRightStyle}>Price</th>
-                      <th style={thRightStyle}>Confidence</th>
-                      <th style={thRightStyle}>Details</th>
+                      <th style={{ ...thLeftStyle, width: '24%' }}>Symbol</th>
+                      <th style={{ ...thLeftStyle, width: '18%' }}>Signal</th>
+                      <th style={{ ...thRightStyle, width: '20%' }}>Price</th>
+                      <th style={{ ...thRightStyle, width: '20%' }}>Confidence</th>
+                      <th style={{ ...thRightStyle, width: '18%' }}>Details</th>
                     </tr>
                   </thead>
                   <tbody>
                     {portfolioRecommendations.slice(0, 8).map((row) => (
                       <tr key={row.symbol} style={tableBodyRowStyle}>
-                        <td style={tdLeftStyle}>{row.symbol.replace('.NS', '')}</td>
+                        <td style={{ ...tdLeftStyle, whiteSpace: 'nowrap' }}>{row.symbol.replace('.NS', '')}</td>
                         <td style={tdLeftStyle}>
                           <SignalBadge signal={row.recommendation} />
                         </td>
-                        <td style={tdRightStyle}>₹{Number(row.last_price || 0).toFixed(2)}</td>
-                        <td style={tdRightStyle}>{(row.confidence * 100).toFixed(0)}%</td>
-                        <td style={tdRightStyle}>
+                        <td style={tdNumberStyle}>₹{Number(row.last_price || 0).toFixed(2)}</td>
+                        <td style={tdNumberStyle}>{(row.confidence * 100).toFixed(1)}%</td>
+                        <td style={{ ...tdRightStyle, whiteSpace: 'nowrap' }}>
                           <Link href={`/company/${row.symbol}`} style={inlineLinkStyle}>
                             Open
                           </Link>
@@ -288,22 +255,22 @@ export default function Dashboard() {
               <EmptyState text="No high-confidence buy opportunities available right now." />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[620px] table-fixed">
                   <thead>
                     <tr style={tableHeadRowStyle}>
-                      <th style={thLeftStyle}>Symbol</th>
-                      <th style={thRightStyle}>Price</th>
-                      <th style={thRightStyle}>Buy Prob.</th>
-                      <th style={thRightStyle}>Details</th>
+                      <th style={{ ...thLeftStyle, width: '34%' }}>Symbol</th>
+                      <th style={{ ...thRightStyle, width: '24%' }}>Price</th>
+                      <th style={{ ...thRightStyle, width: '24%' }}>Buy Prob.</th>
+                      <th style={{ ...thRightStyle, width: '18%' }}>Details</th>
                     </tr>
                   </thead>
                   <tbody>
                     {buyOpportunities.slice(0, 8).map((row) => (
                       <tr key={row.symbol} style={tableBodyRowStyle}>
-                        <td style={tdLeftStyle}>{row.symbol.replace('.NS', '')}</td>
-                        <td style={tdRightStyle}>₹{Number(row.last_price || 0).toFixed(2)}</td>
-                        <td style={tdRightStyle}>{((row.buy_prob || row.confidence) * 100).toFixed(0)}%</td>
-                        <td style={tdRightStyle}>
+                        <td style={{ ...tdLeftStyle, whiteSpace: 'nowrap' }}>{row.symbol.replace('.NS', '')}</td>
+                        <td style={tdNumberStyle}>₹{Number(row.last_price || 0).toFixed(2)}</td>
+                        <td style={tdNumberStyle}>{((row.buy_prob || row.confidence) * 100).toFixed(1)}%</td>
+                        <td style={{ ...tdRightStyle, whiteSpace: 'nowrap' }}>
                           <Link href={`/company/${row.symbol}`} style={inlineLinkStyle}>
                             Open
                           </Link>
@@ -417,6 +384,12 @@ const tdRightStyle: React.CSSProperties = {
   color: 'var(--text-secondary)',
   fontWeight: 700,
   fontSize: '0.84rem',
+}
+
+const tdNumberStyle: React.CSSProperties = {
+  ...tdRightStyle,
+  fontVariantNumeric: 'tabular-nums',
+  whiteSpace: 'nowrap',
 }
 
 const actionLinkStyle: React.CSSProperties = {

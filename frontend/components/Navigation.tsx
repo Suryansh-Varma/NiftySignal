@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useAuth } from '../lib/auth'
@@ -7,6 +7,7 @@ export default function Navigation() {
   const { isAuthenticated, signOut } = useAuth()
   const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const firstMobileLinkRef = useRef<HTMLAnchorElement | null>(null)
 
   const links = useMemo(
     () => [
@@ -28,6 +29,27 @@ export default function Navigation() {
 
   const isActive = (path: string) => router.pathname === path
 
+  useEffect(() => {
+    setMobileMenuOpen(false)
+  }, [router.pathname])
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    firstMobileLinkRef.current?.focus()
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [mobileMenuOpen])
+
   return (
     <nav
       style={{
@@ -47,7 +69,7 @@ export default function Navigation() {
             <div className="flex items-center gap-2">
               <span style={{ fontSize: '1.25rem' }}>📈</span>
               <span style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
-                NiftySignal
+                NIFTYSIGNAL AI
               </span>
             </div>
           </Link>
@@ -144,6 +166,8 @@ export default function Navigation() {
                   cursor: 'pointer',
                 }}
                 aria-label="Toggle menu"
+                aria-expanded={mobileMenuOpen}
+                aria-controls="mobile-navigation-menu"
               >
                 {mobileMenuOpen ? '×' : '☰'}
               </button>
@@ -153,6 +177,7 @@ export default function Navigation() {
 
         {isAuthenticated && mobileMenuOpen && (
           <div
+            id="mobile-navigation-menu"
             className="mobile-only"
             style={{
               display: 'flex',
@@ -160,11 +185,14 @@ export default function Navigation() {
               gap: '0.5rem',
               paddingBottom: '1rem',
             }}
+            role="menu"
+            aria-label="Mobile navigation"
           >
-            {links.map((link) => (
+            {links.map((link, index) => (
               <Link
                 key={link.href}
                 href={link.href}
+                ref={index === 0 ? firstMobileLinkRef : undefined}
                 onClick={() => setMobileMenuOpen(false)}
                 style={{
                   textDecoration: 'none',
@@ -175,6 +203,7 @@ export default function Navigation() {
                   background: 'rgba(15, 23, 42, 0.75)',
                   fontWeight: 700,
                 }}
+                role="menuitem"
               >
                 {link.label}
               </Link>

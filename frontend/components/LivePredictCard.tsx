@@ -24,7 +24,10 @@ export default function LivePredictCard() {
   // Autocomplete states
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listboxId = 'live-predict-suggestions';
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -42,25 +45,67 @@ export default function LivePredictCard() {
     
     if (upperVal.length > 0) {
       const filtered = NIFTY_50.filter(s => 
-        s.includes(upperVal) || getCompanyName(s).toUpperCase().includes(upperVal)
+        s.replace('.NS', '').startsWith(upperVal) ||
+        getCompanyName(s).toUpperCase().startsWith(upperVal) ||
+        s.includes(upperVal) ||
+        getCompanyName(s).toUpperCase().includes(upperVal)
       ).slice(0, 5);
       setSuggestions(filtered);
       setShowDropdown(true);
+      setActiveIndex(filtered.length > 0 ? 0 : -1);
     } else {
       setSuggestions([]);
       setShowDropdown(false);
+      setActiveIndex(-1);
     }
   };
 
   const selectSymbol = (s: string) => {
-    setSymbol(s);
+    setSymbol(s.replace('.NS', ''));
     setShowDropdown(false);
+    setActiveIndex(-1);
+    inputRef.current?.focus();
+  };
+
+  const handleInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showDropdown || suggestions.length === 0) {
+      if (event.key === 'ArrowDown' && suggestions.length > 0) {
+        event.preventDefault();
+        setShowDropdown(true);
+        setActiveIndex(0);
+      }
+      return;
+    }
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setActiveIndex((prev) => (prev + 1) % suggestions.length);
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setActiveIndex((prev) => (prev <= 0 ? suggestions.length - 1 : prev - 1));
+      return;
+    }
+
+    if (event.key === 'Enter' && activeIndex >= 0) {
+      event.preventDefault();
+      selectSymbol(suggestions[activeIndex]);
+      return;
+    }
+
+    if (event.key === 'Escape' || event.key === 'Tab') {
+      setShowDropdown(false);
+      setActiveIndex(-1);
+    }
   };
 
   const handlePredict = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!symbol) return;
     setShowDropdown(false);
+    setActiveIndex(-1);
     
     setLoading(true);
     setScanning(true);
@@ -71,7 +116,7 @@ export default function LivePredictCard() {
 
     try {
       const sym = symbol.toUpperCase().includes('.NS') ? symbol.toUpperCase() : `${symbol.toUpperCase()}.NS`;
-      const res = await fetch(`http://127.0.0.1:8000/api/predict/${sym}`);
+      const res = await fetch(`/api/predict/${encodeURIComponent(sym)}`);
       if (!res.ok) throw new Error("Instrument not found in operational universe");
       const json = await res.json();
       setPrediction(json);
@@ -90,52 +135,75 @@ export default function LivePredictCard() {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-8 rounded-3xl border border-[var(--border-glass)] bg-[var(--bg-card)] shadow-2xl relative overflow-hidden transition-all duration-700 hover:shadow-[var(--shadow-glow)]">
+    <div className="flex flex-col gap-6 p-8 rounded-3xl border border-[var(--border-glass)] bg-[var(--bg-card)] shadow-2xl relative transition-all duration-700 hover:shadow-[var(--shadow-glow)]">
       
       <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-        <span className="text-4xl font-mono text-[var(--primary-glow)]">TERM_RECON</span>
+        <span className="text-4xl font-mono text-[var(--primary-glow)]">LIVE_SCAN</span>
       </div>
 
-      <div className="space-y-4 relative z-20">
+      <div className="space-y-4 relative z-20 overflow-visible">
         <div className="flex items-center gap-2">
            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary-glow)" strokeWidth="3"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-           <h3 className="text-[10px] font-bold tracking-[0.3em] uppercase text-[var(--primary-glow)]">Live AI Reconnaissance</h3>
+           <h3 className="text-[10px] font-bold tracking-[0.3em] uppercase text-[var(--primary-glow)]">Live Stock Lookup</h3>
         </div>
         
-        <form onSubmit={handlePredict} className="relative">
+        <form onSubmit={handlePredict} className="relative z-30 overflow-visible">
           <div className="flex gap-2 p-1 rounded-2xl bg-[var(--bg-deep)] border border-[var(--border-glass)] shadow-inner">
             <input 
+              ref={inputRef}
               type="text" 
-              placeholder="SEARCH ASSET (E.G. RELIANCE)"
+              placeholder="Search stock (e.g., RELIANCE)"
               className="flex-1 bg-transparent border-none py-3 px-5 text-[10px] font-mono focus:ring-0 text-slate-100 placeholder-slate-600 uppercase tracking-widest"
               value={symbol}
               onChange={(e) => handleInputChange(e.target.value)}
-              onFocus={() => symbol.length > 0 && setShowDropdown(true)}
+              onFocus={() => symbol.length > 0 && suggestions.length > 0 && setShowDropdown(true)}
+              onKeyDown={handleInputKeyDown}
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={showDropdown && suggestions.length > 0}
+              aria-controls={listboxId}
+              aria-activedescendant={activeIndex >= 0 ? `live-predict-option-${activeIndex}` : undefined}
             />
             <button 
               type="submit"
               disabled={loading}
               className="bg-[var(--primary-glow)] text-black px-6 py-3 rounded-xl font-black text-[9px] uppercase tracking-[0.2em] hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
+              aria-label="Get stock signal"
             >
-              {loading ? "INFERENCE..." : "RECON_INIT"}
+              {loading ? "Loading..." : "Get Signal"}
             </button>
           </div>
 
-          {/* Autocomplete Dropdown */}
-          {showDropdown && suggestions.length > 0 && (
-            <div ref={dropdownRef} className="absolute top-full left-0 right-0 mt-2 p-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-glass)] shadow-2xl z-50 backdrop-blur-xl animate-in slide-in-from-top-2">
-              {suggestions.map((s) => (
-                <div 
+          {/* Autocomplete Dropdown - Debug Container */}
+          {showDropdown && suggestions.length > 0 ? (
+            <div
+              ref={dropdownRef}
+              id={listboxId}
+              role="listbox"
+              aria-label="Stock suggestions"
+              className="absolute top-full left-0 right-0 mt-2 p-2 rounded-2xl bg-[var(--bg-card)] border-2 border-[var(--primary-glow)] shadow-2xl z-50 backdrop-blur-xl overflow-y-auto max-h-64 min-w-max"
+              style={{ pointerEvents: 'auto' }}
+            >
+              {suggestions.map((s, index) => (
+                <button
                   key={s}
+                  id={`live-predict-option-${index}`}
+                  type="button"
+                  role="option"
+                  aria-selected={activeIndex === index}
                   onClick={() => selectSymbol(s)}
-                  className="flex justify-between items-center p-3 rounded-xl hover:bg-white/5 cursor-pointer transition-colors group"
+                  onMouseEnter={() => setActiveIndex(index)}
+                  className="w-full flex justify-between items-center p-3 rounded-xl hover:bg-white/5 cursor-pointer transition-colors group"
+                  style={{
+                    background: activeIndex === index ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                  }}
                 >
                   <span className="text-[10px] font-black text-white uppercase tracking-tighter italic">{getCompanyName(s)}</span>
                   <span className="text-[9px] font-mono text-[var(--text-muted)] group-hover:text-[var(--primary-glow)]">{s.replace('.NS', '')}</span>
-                </div>
+                </button>
               ))}
             </div>
-          )}
+          ) : null}
         </form>
       </div>
 

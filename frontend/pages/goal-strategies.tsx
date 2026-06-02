@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import axios from 'axios'
+import { getClientApiBase, buildApiUrl } from '../lib/api-base'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_BASE = getClientApiBase()
 
 type StrategyType = 'conservative' | 'moderate' | 'aggressive'
 
@@ -44,7 +45,7 @@ export default function GoalStrategiesPage() {
   useEffect(() => {
     const fetchStrategies = async () => {
       try {
-        const res = await axios.get(`${API_BASE}/api/goal_strategies`)
+        const res = await axios.get(buildApiUrl(API_BASE, '/api/goal_strategies'))
         setStrategies(res.data)
       } catch (err) {
         console.error('Failed to fetch strategies:', err)
@@ -57,7 +58,7 @@ export default function GoalStrategiesPage() {
     const fetchBest = async () => {
       setBestLoading(true)
       try {
-        const res = await axios.get(`${API_BASE}/api/goal_best`)
+        const res = await axios.get(buildApiUrl(API_BASE, '/api/goal_best'))
         setBest(res.data)
       } catch (err) {
         console.error('Failed to fetch best strategy:', err)
@@ -73,7 +74,7 @@ export default function GoalStrategiesPage() {
       setLoading(true)
       setError(null)
       try {
-        const res = await axios.get(`${API_BASE}/api/goal_recommendations/${selectedStrategy}`)
+        const res = await axios.get(buildApiUrl(API_BASE, `/api/goal_recommendations/${selectedStrategy}`))
         setRecommendations(res.data)
       } catch (err) {
         setError(`Failed to load ${selectedStrategy} recommendations. Train models and try again.`)
@@ -195,26 +196,26 @@ export default function GoalStrategiesPage() {
             <p style={{ margin: 0, color: 'var(--text-secondary)' }}>No recommendations available for this strategy.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[760px] table-fixed">
                 <thead>
                   <tr style={tableHeadRowStyle}>
-                    <th style={thLeftStyle}>Rank</th>
-                    <th style={thLeftStyle}>Symbol</th>
-                    <th style={thRightStyle}>Price</th>
-                    <th style={thRightStyle}>Confidence</th>
-                    <th style={thRightStyle}>Weight</th>
-                    <th style={thRightStyle}>Allocation</th>
+                    <th style={{ ...thLeftStyle, width: '10%' }}>Rank</th>
+                    <th style={{ ...thLeftStyle, width: '20%' }}>Symbol</th>
+                    <th style={{ ...thRightStyle, width: '18%' }}>Price</th>
+                    <th style={{ ...thRightStyle, width: '16%' }}>Confidence</th>
+                    <th style={{ ...thRightStyle, width: '14%' }}>Weight</th>
+                    <th style={{ ...thRightStyle, width: '22%' }}>Allocation</th>
                   </tr>
                 </thead>
                 <tbody>
                   {computedRecs.map((rec, idx) => (
                     <tr key={`${rec.symbol}-${idx}`} style={tableBodyRowStyle}>
-                      <td style={tdLeftStyle}>{idx + 1}</td>
-                      <td style={tdLeftStyle}>{rec.symbol.replace('.NS', '')}</td>
-                      <td style={tdRightStyle}>{formatINR(rec.close)}</td>
-                      <td style={tdRightStyle}>{rec.confidence.toFixed(1)}%</td>
-                      <td style={tdRightStyle}>{(rec.weight * 100).toFixed(1)}%</td>
-                      <td style={tdRightStyle}>{formatINR(rec.allocationComputed)}</td>
+                      <td style={tdNumberStyle}>{idx + 1}</td>
+                      <td style={{ ...tdLeftStyle, whiteSpace: 'nowrap' }}>{rec.symbol.replace('.NS', '')}</td>
+                      <td style={tdNumberStyle}>{formatINR(rec.close)}</td>
+                      <td style={tdNumberStyle}>{rec.confidence.toFixed(1)}%</td>
+                      <td style={tdNumberStyle}>{(rec.weight * 100).toFixed(1)}%</td>
+                      <td style={tdNumberStyle}>{formatINR(rec.allocationComputed)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -367,4 +368,10 @@ const tdRightStyle: React.CSSProperties = {
   color: 'var(--text-secondary)',
   fontWeight: 700,
   fontSize: '0.84rem',
+}
+
+const tdNumberStyle: React.CSSProperties = {
+  ...tdRightStyle,
+  fontVariantNumeric: 'tabular-nums',
+  whiteSpace: 'nowrap',
 }

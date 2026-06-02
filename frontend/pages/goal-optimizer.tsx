@@ -2,8 +2,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
+import PageLoader from '../components/PageLoader'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
+import { getClientApiBase, buildApiUrl } from '../lib/api-base'
 
 type Stock = {
   symbol: string
@@ -55,7 +57,7 @@ export default function GoalOptimizer() {
   const [loading, setLoading] = useState(false)
   const [portfolioLoading, setPortfolioLoading] = useState(true)
   const [selectedStrategy, setSelectedStrategy] = useState<'conservative' | 'moderate' | 'aggressive'>('moderate')
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+  const apiUrl = getClientApiBase()
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -81,7 +83,7 @@ export default function GoalOptimizer() {
       const normalized = (positions || []) as PortfolioPosition[]
       setPortfolioPositions(normalized)
 
-      const recRes = await fetch(`${apiUrl}/api/recommendations`)
+      const recRes = await fetch(buildApiUrl(apiUrl, '/api/recommendations'))
       const recommendations = await recRes.json()
       const priceMap: Record<string, number> = {}
       recommendations.forEach((rec: any) => {
@@ -111,7 +113,7 @@ export default function GoalOptimizer() {
 
     setLoading(true)
     try {
-      const res = await fetch(`${apiUrl}/api/portfolio_optimizer?capital=${portfolioValue}&target=${targetReturn}`)
+      const res = await fetch(buildApiUrl(apiUrl, `/api/portfolio_optimizer?capital=${portfolioValue}&target=${targetReturn}`))
       const data = await res.json()
       setResult(data)
       setSelectedStrategy(data.recommended)
@@ -125,12 +127,7 @@ export default function GoalOptimizer() {
   const targetAmount = useMemo(() => Math.round(portfolioValue * (1 + targetReturn / 100)), [portfolioValue, targetReturn])
 
   if (authLoading || portfolioLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center" style={{ gap: '0.9rem' }}>
-        <div className="animate-spin" style={{ width: '2.75rem', height: '2.75rem', border: '4px solid var(--slate-200)', borderTopColor: 'var(--primary-500)', borderRadius: '50%' }} />
-        <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Loading goal optimizer...</span>
-      </div>
-    )
+    return <PageLoader isLoading={true} message="Loading goal optimizer..." />
   }
 
   return (
@@ -256,24 +253,24 @@ export default function GoalOptimizer() {
 function SelectedPlanTable({ strategy }: { strategy: Strategy }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full">
+      <table className="w-full min-w-[700px] table-fixed">
         <thead>
           <tr style={tableHeadRowStyle}>
-            <th style={thLeftStyle}>Stock</th>
-            <th style={thRightStyle}>Price</th>
-            <th style={thRightStyle}>Shares</th>
-            <th style={thRightStyle}>Allocation</th>
-            <th style={thRightStyle}>Buy Prob.</th>
+            <th style={{ ...thLeftStyle, width: '22%' }}>Stock</th>
+            <th style={{ ...thRightStyle, width: '20%' }}>Price</th>
+            <th style={{ ...thRightStyle, width: '14%' }}>Shares</th>
+            <th style={{ ...thRightStyle, width: '28%' }}>Allocation</th>
+            <th style={{ ...thRightStyle, width: '16%' }}>Buy Prob.</th>
           </tr>
         </thead>
         <tbody>
           {strategy.stocks.map((stock) => (
             <tr key={stock.symbol} style={tableBodyRowStyle}>
-              <td style={tdLeftStyle}>{stock.symbol.replace('.NS', '')}</td>
-              <td style={tdRightStyle}>₹{Number(stock.last_price || 0).toFixed(2)}</td>
-              <td style={tdRightStyle}>{stock.shares}</td>
-              <td style={tdRightStyle}>₹{Math.round(stock.actual_allocation || 0).toLocaleString('en-IN')}</td>
-              <td style={tdRightStyle}>{((stock.buy_prob || 0) * 100).toFixed(1)}%</td>
+              <td style={{ ...tdLeftStyle, whiteSpace: 'nowrap' }}>{stock.symbol.replace('.NS', '')}</td>
+              <td style={tdNumberStyle}>₹{Number(stock.last_price || 0).toFixed(2)}</td>
+              <td style={tdNumberStyle}>{stock.shares}</td>
+              <td style={tdNumberStyle}>₹{Math.round(stock.actual_allocation || 0).toLocaleString('en-IN')}</td>
+              <td style={tdNumberStyle}>{((stock.buy_prob || 0) * 100).toFixed(1)}%</td>
             </tr>
           ))}
         </tbody>
@@ -419,4 +416,10 @@ const tdRightStyle: React.CSSProperties = {
   color: 'var(--text-secondary)',
   fontWeight: 700,
   fontSize: '0.84rem',
+}
+
+const tdNumberStyle: React.CSSProperties = {
+  ...tdRightStyle,
+  fontVariantNumeric: 'tabular-nums',
+  whiteSpace: 'nowrap',
 }

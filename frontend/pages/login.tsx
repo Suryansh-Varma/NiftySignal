@@ -45,7 +45,7 @@ export default function Login() {
         <div style={{ position: 'relative', zIndex: 10, maxWidth: '440px' }}>
           <Link href="/" className="flex items-center gap-3" style={{ textDecoration: 'none', marginBottom: '4rem' }}>
             <span className="skeuo-knob" style={{ width: '40px', height: '40px' }}></span>
-            <span style={{ fontSize: '2rem', fontWeight: 900, color: 'white', letterSpacing: '-0.02em' }}>NiftySignal</span>
+            <span style={{ fontSize: '2rem', fontWeight: 900, color: 'white', letterSpacing: '-0.02em' }}>NIFTYSIGNAL AI</span>
           </Link>
 
           <h1 style={{ fontSize: '3.5rem', fontWeight: 900, color: 'white', lineHeight: 1.1, marginBottom: '2rem' }}>

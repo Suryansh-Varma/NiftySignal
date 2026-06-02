@@ -1,0 +1,111 @@
+{
+    "model_type": "ensemble",
+    "train_accuracy": 0.6616751269035533,
+    "test_accuracy": 0.5791878172588832,
+    "sector_weighted_accuracy": 0.5541,
+    "report": {
+        "-1": {
+            "precision": 0.6419753086419753,
+            "recall": 0.24644549763033174,
+            "f1-score": 0.3561643835616438,
+            "support": 422.0
+        },
+        "0": {
+            "precision": 0.5733482642777156,
+            "recall": 0.9463955637707948,
+            "f1-score": 0.7140864714086471,
+            "support": 1082.0
+        },
+        "1": {
+            "precision": 0.5909090909090909,
+            "recall": 0.027896995708154508,
+            "f1-score": 0.05327868852459016,
+            "support": 466.0
+        },
+        "accuracy": 0.5791878172588832,
+        "macro avg": {
+            "precision": 0.6020775546095939,
+            "recall": 0.40691268570309364,
+            "f1-score": 0.37450984783162705,
+            "support": 1970.0
+        },
+        "weighted avg": {
+            "precision": 0.5922030652583951,
+            "recall": 0.5791878172588832,
+            "f1-score": 0.48110192932976087,
+            "support": 1970.0
+        }
+    },
+    "sector_breakdown": {
+        "Auto": {
+            "samples": 985,
+            "test_accuracy": 0.5076,
+            "test_f1": 0.4402
+        },
+        "Banking": {
+            "samples": 1182,
+            "test_accuracy": 0.5949,
+            "test_f1": 0.4438
+        },
+        "Consumer Discretionary": {
+            "samples": 394,
+            "test_accuracy": 0.5063,
+            "test_f1": 0.3404
+        },
+        "Energy": {
+            "samples": 591,
+            "test_accuracy": 0.6218,
+            "test_f1": 0.4769
+        },
+        "FMCG": {
+            "samples": 985,
+            "test_accuracy": 0.6091,
+            "test_f1": 0.4785
+        },
+        "Finance": {
+            "samples": 985,
+            "test_accuracy": 0.401,
+            "test_f1": 0.2407
+        },
+        "Healthcare": {
+            "samples": 197,
+            "test_accuracy": 0.5,
+            "test_f1": 0.3333
+        },
+        "Infrastructure": {
+            "samples": 788,
+            "test_accuracy": 0.557,
+            "test_f1": 0.405
+        },
+        "Materials": {
+            "samples": 394,
+            "test_accuracy": 0.6076,
+            "test_f1": 0.4593
+        },
+        "Metals": {
+            "samples": 591,
+            "test_accuracy": 0.4538,
+            "test_f1": 0.2833
+        },
+        "Pharma": {
+            "samples": 788,
+            "test_accuracy": 0.5823,
+            "test_f1": 0.4892
+        },
+        "Technology": {
+            "samples": 1182,
+            "test_accuracy": 0.616,
+            "test_f1": 0.6034
+        },
+        "Telecom": {
+            "samples": 197,
+            "test_accuracy": 0.6,
+            "test_f1": 0.4688
+        },
+        "Utilities": {
+            "samples": 591,
+            "test_accuracy": 0.5798,
+            "test_f1": 0.4318
+        }
+    }
+}

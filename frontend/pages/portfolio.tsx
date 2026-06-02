@@ -2,8 +2,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
+import PageLoader from '../components/PageLoader'
 import { useAuth } from '../lib/auth'
 import { supabase, isValidNiftySymbol, getCompanyName, NIFTY_50 } from '../lib/supabase'
+import { getClientApiBase, buildApiUrl } from '../lib/api-base'
 
 type PortfolioPosition = {
   id: number
@@ -35,7 +37,7 @@ export default function PortfolioPage() {
   const [success, setSuccess] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lastSubmitTime, setLastSubmitTime] = useState(0)
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+  const apiUrl = getClientApiBase()
 
   useEffect(() => {
     if (authLoading) return
@@ -85,7 +87,7 @@ export default function PortfolioPage() {
       setPositions((data || []) as PortfolioPosition[])
 
       if (data && data.length > 0) {
-        const recRes = await fetch(`${apiUrl}/api/recommendations`)
+        const recRes = await fetch(buildApiUrl(apiUrl, '/api/recommendations'))
         const recommendations = await recRes.json()
         const priceMap: Record<string, { price: number; date: string }> = {}
         recommendations.forEach((rec: any) => {
@@ -106,7 +108,7 @@ export default function PortfolioPage() {
   const fetchAnalytics = async () => {
     try {
       const holdings = positions.map((p) => ({ symbol: p.symbol, shares: p.quantity, avg_buy_price: p.buy_price }))
-      const res = await fetch(`${apiUrl}/api/portfolio/analyze`, {
+      const res = await fetch(buildApiUrl(apiUrl, '/api/portfolio/analyze'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(holdings),
@@ -257,12 +259,7 @@ export default function PortfolioPage() {
   }, [positions, currentPrices])
 
   if (authLoading || loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center" style={{ gap: '0.9rem' }}>
-        <div className="animate-spin" style={{ width: '2.75rem', height: '2.75rem', border: '4px solid var(--slate-200)', borderTopColor: 'var(--primary-500)', borderRadius: '50%' }} />
-        <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Loading portfolio...</span>
-      </div>
-    )
+    return <PageLoader isLoading={true} message="Loading portfolio..." />
   }
 
   return (
