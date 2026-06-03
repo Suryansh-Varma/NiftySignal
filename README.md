@@ -1,87 +1,79 @@
-# NiftySignal - Intelligence-Driven NSE Trading Terminal
+# NiftySignal - NSE Trading Intelligence Backend
 
-NiftySignal is a state-of-the-art trading intelligence platform designed for the Indian stock market (NSE). It leverages machine learning and technical analysis to provide high-precision buy/sell signals across the entire NSE universe (3000+ stocks).
+NiftySignal is a Python-based trading intelligence backend for the Indian stock market (NSE). It generates buy, hold, and sell signals, portfolio goal suggestions, risk analysis, and supporting analytics for the NSE universe.
 
-![Dashboard Preview](docs/assets/dashboard_preview.png) *(Placeholder - see documentation for visual guide)*
+## Architecture
 
-## 🚀 Key Features
+```text
+Market Data Sources
+  -> Ingestion & Processing (app/api, app/utils, app/data)
+  -> Model Training & Signals (app/api/train_model.py, app/signals)
+  -> Recommendation Outputs (results/latest_recommendations.csv)
+  -> Portfolio Analysis (portfolio_goal_optimizer.py, app/portfolio)
+  -> Reports & Plans (results/)
 
-- **Omniscient Surveillance**: Monitoring 3000+ NSE stocks with real-time intelligence.
-- **ML Signaling**: Proprietary machine learning models trained on price action, volume, and volatility.
-- **Strategic Goal Optimizer**: Intelligent portfolio allocation based on target returns and time horizons.
-- **Risk Quantum**: Real-time risk analysis incorporating macro factors and sectoral rotation.
-- **Institutional-Grade UI**: A premium, skeuomorphic "terminal" interface built with Next.js and Tailwind.
-- **On-Demand Intelligence**: Smart hybrid data fetching (nselib + yfinance) for maximum reliability.
-
-## 📁 Repository Structure
-
+FastAPI Server (app/api_server/main.py)
+  -> API Clients / CLI / Scripts
 ```
-├── app/                # Core Python Backend
-│   ├── api/            # ML models, training scripts, & data logic
+
+## Repository Structure
+
+```text
+├── app/                # Core Python backend
+│   ├── api/            # Model training and recommendation logic
 │   ├── api_server/     # FastAPI application server
-│   ├── portfolio/      # Portfolio Management logic
+│   ├── portfolio/      # Portfolio models and recommendation helpers
 │   ├── signals/        # Signal generation engines
 │   └── utils/          # Shared utility functions
-├── frontend/           # Next.js Web Interface (Strategic Terminal)
-├── data/               # Persistent data storage (Raw & Processed)
-├── models/             # Serialized ML model containers
-├── docs/               # System documentation & architectural maps
-├── scripts/            # Maintenance & utility scripts
-└── results/            # Performance analytics & recommendation logs
+├── data/               # Raw and processed datasets
+├── models/             # Serialized ML model artifacts
+├── docs/               # System documentation
+├── results/            # Generated recommendation and analysis outputs
+├── scripts/            # Maintenance and utility scripts
+└── portfolio_goal_optimizer.py  # CLI portfolio optimizer
 ```
 
-## 🛠️ Technical Stack
+## Run Commands
 
-- **Frontend**: Next.js 14, React 18, Chart.js, Tailwind CSS, TypeScript
-- **Backend API**: FastAPI (Python 3.12+), Uvicorn
-- **ML Engine**: Scikit-Learn, Pandas, NumPy, TA-Lib
-- **Storage**: Supabase (PostgreSQL), PyArrow (Local Caching)
-- **Data Pipeline**: nselib, yfinance
-
-## 📥 Quick Start
-
-### 1. Backend Setup
-```bash
-# Initialize Python environment
+### 1. Create and activate the Python environment
+```powershell
 python -m venv .venv
-source .venv/bin/activate  # Or .venv\Scripts\activate on Windows
+.\.venv\Scripts\Activate.ps1
+```
 
-# Install critical dependencies
+### 2. Install dependencies
+```powershell
 pip install -r requirements.txt
 ```
 
-### 2. Frontend Setup
-```bash
-cd frontend
-npm install
+### 3. Start the FastAPI backend
+```powershell
+cd app/api_server
+python -m uvicorn main:app --reload --port 8000
 ```
 
-### 3. Launch the Terminal
-The easiest way to start the ecosystem is using the integrated startup script:
-```bash
-python start_fullstack.py
+### 4. Generate portfolio analysis
+```powershell
+python portfolio_goal_optimizer.py --portfolio "RELIANCE,TCS,INFY" --capital 100000 --num-buy 20
 ```
 
-## 🚢 Deployment Strategy
+### 5. Refresh recommendations or data
+```powershell
+python generate_recommendations.py
+python refresh_all_nse_data.py
+```
 
-The system is architected for containerized deployment.
+## Notes
 
-1. **Docker Compose**:
-   ```bash
-   docker-compose up --build
-   ```
+- The frontend has been removed from this repository.
+- The main outputs are now the backend API, CLI tools, and generated files under `results/`.
+- `results/latest_recommendations.csv` is the key input for the portfolio optimizer.
 
-2. **Manual Deployment**:
-   - Deploy the **FastAPI Backend** (e.g., AWS App Runner, DigitalOcean App Platform).
-   - Deploy the **Next.js Frontend** (e.g., Vercel, Netlify).
-   - Configure environment variables listed in `frontend/.env.local`.
+## Documentation
 
-## 📈 Documentation
-
-Comprehensive guides are located in the `docs/` directory:
-- [Architecture Overview](docs/ARCHITECTURE.md)
+Useful references:
+- [Architecture](docs/ARCHITECTURE.md)
 - [Deployment Validation](docs/DEPLOYMENT_VALIDATION_CHECKLIST.md)
-- [Strategic Goal Guide](docs/GOAL_STRATEGIES_GUIDE.md)
+- [Goal Strategies](docs/GOAL_STRATEGIES_GUIDE.md)
 
----
-*Disclaimer: This system is for educational/analytical purposes. Trading involves risk.*
+*Disclaimer: This system is for educational and analytical purposes. Trading involves risk.*

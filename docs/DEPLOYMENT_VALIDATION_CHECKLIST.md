@@ -331,7 +331,7 @@ CORS_ALLOW_CREDENTIALS=true
 - [ ] Environment variables documented
 
 **Documentation Complete:**
-- [ ] Setup guide written (FULLSTACK_SETUP.md) ✅
+- [ ] Backend setup guide written (README.md) ✅
 - [ ] Integration tests documented (BACKEND_INTEGRATION_TESTING.md) ✅
 - [ ] Common issues documented (COMMON_ISSUES_AND_FIXES.md) ✅
 - [ ] Deployment guide written (this file)
@@ -390,4 +390,4 @@ All development work complete. System tested locally. Ready to:
 3. Set up monitoring and alerts
 4. Launch to users
 
-See FULLSTACK_SETUP.md, BACKEND_INTEGRATION_TESTING.md, and COMMON_ISSUES_AND_FIXES.md for operational docs.
+See README.md, BACKEND_INTEGRATION_TESTING.md, and COMMON_ISSUES_AND_FIXES.md for operational docs.

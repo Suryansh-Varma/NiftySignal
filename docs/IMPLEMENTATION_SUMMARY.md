@@ -51,7 +51,6 @@ A real-time, light-themed portfolio dashboard featuring:
 ✅ **Documentation**:
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Complete deployment guide (Dev, Docker, Vercel, VPS, Production)
 - [QUICK_START.md](QUICK_START.md) - Quick reference (updated)
-- [README_DASHBOARD.md](README_DASHBOARD.md) - Dashboard feature docs
 
 ---
 
@@ -173,8 +172,7 @@ NiftySIgnal/
 │
 ├── docker-compose.yml                   (updated: added ws-server)
 ├── DEPLOYMENT.md                        🆕 (NEW: full deployment guide)
-├── QUICK_START.md                       (updated: new dashboard info)
-├── README_DASHBOARD.md                  🆕 (NEW: dashboard docs)
+├── QUICK_START.md                       (updated: backend startup info)
 │
 ├── app/, data/, models/, results/ (existing Python backend - untouched)
 └── other existing files...
@@ -225,7 +223,7 @@ To use real data instead of mocks:
 3. **Replace ws-server broadcasts** → Connect to real price ticker/feed
 4. **Add auth** → JWT login in frontend, validate in WebSocket
 
-See [README_DASHBOARD.md](README_DASHBOARD.md) section "Next Steps" for details.
+The frontend dashboard documentation has been removed as part of the backend-only cleanup.
 
 ---
 
@@ -269,10 +267,9 @@ Before production deployment:
 
 ## 📞 Support & Questions
 
-- **Frontend Issues**: Check [frontend/pages/dashboard.tsx](frontend/pages/dashboard.tsx)
+- **Backend Issues**: Check the FastAPI app under [app/api_server](../app/api_server)
 - **WebSocket Issues**: Check [ws-server/index.js](ws-server/index.js)
 - **Deployment**: See [DEPLOYMENT.md](DEPLOYMENT.md)
-- **Dashboard Features**: See [README_DASHBOARD.md](README_DASHBOARD.md)
 - **Quick Help**: See [QUICK_START.md](QUICK_START.md)
 
 ---

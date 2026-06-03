@@ -157,7 +157,7 @@ diff <(grep "'[A-Z]*\.NS'" app/config.py | sort) \
 - Each user's portfolio is stored locally in their browser
 
 **Permanent fix**:
-1. Deploy Supabase schema (see FULLSTACK_SETUP.md)
+1. Deploy Supabase schema (see README.md or supabase_schema.sql)
 2. Update portfolio.tsx to use:
 ```typescript
 // Instead of loadPortfolio() with localStorage:
